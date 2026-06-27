@@ -49,7 +49,3 @@ This is how you move your walk from your phone to your laptop (or vice versa): e
 - Mapping library: Leaflet.
 
 The Wales Coast Path (Llwybr Arfordir Cymru) is managed by [Natural Resources Wales](https://naturalresources.wales/) and partner authorities.
-
-## Licence
-
-Add your chosen licence here (for example, MIT for the code). Note that the underlying route data and map tiles carry their own terms from Ordnance Survey and OpenStreetMap respectively; check those before redistributing the data itself.
