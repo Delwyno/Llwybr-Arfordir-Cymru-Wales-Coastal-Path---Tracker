@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Wales Coast Path Map Tracker</title>
 
 <!-- Home-screen app icon & PWA meta -->
@@ -32,7 +32,9 @@
   html,body{height:100%}
   body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--sand);
     color:var(--ink);-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;
-    height:100vh;overflow:hidden}
+    height:100vh;height:100dvh;overflow:hidden;
+    -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;
+    overscroll-behavior:none}
   header{background:linear-gradient(160deg,var(--sea),var(--sea-deep));color:#fff;
     padding:13px 20px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px}
   .brand .eyebrow{text-transform:uppercase;letter-spacing:.2em;font-size:.58rem;font-weight:700;color:var(--shell)}
@@ -82,10 +84,30 @@
   .btn:hover{background:var(--sand);color:var(--ink)}
   @media(max-width:760px){
     .main{flex-direction:column}
-    #map{height:52%;flex:none}
-    .panel{flex:1 1 auto;border-left:none;border-top:1px solid var(--line)}
+    /* Map gets the majority of the screen; panel scrolls below it */
+    #map{height:58dvh;flex:none}
+    .panel{flex:1 1 auto;border-left:none;border-top:1px solid var(--line);
+      padding:14px;-webkit-overflow-scrolling:touch;
+      padding-bottom:calc(18px + env(safe-area-inset-bottom))}
     .hdr-stats .hbar-track{display:none}
     .brand h1{font-size:.98rem}
+    header{padding-top:calc(13px + env(safe-area-inset-top))}
+    /* Bigger tap targets on touch screens */
+    .leg{padding:13px 12px 13px 14px;font-size:.86rem}
+    .leg-check{width:24px;height:24px}
+    .leg-check svg{width:14px;height:14px}
+    .sec-head{padding:14px 12px}
+    .sec-name{font-size:.92rem}
+    .btn{padding:13px 9px;font-size:.72rem}
+    .hint{font-size:.84rem}
+  }
+  /* Only show hover effects on devices that actually have a hover pointer
+     (avoids sticky-hover glitches on touch screens) */
+  @media(hover:none){
+    .sec-head:hover{background:#fff}
+    .leg:hover{background:#fff}
+    .btn:hover{background:#fff;color:var(--ink-soft)}
+    .town-dot:hover{transform:none}
   }
   .town-label{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:4px;
     padding:1px 5px;font-size:10px;font-weight:600;color:var(--ink);white-space:nowrap;
@@ -93,6 +115,13 @@
   .leaflet-div-icon{background:none;border:none}
   .town-dot{width:13px;height:13px;border-radius:50%;border:3px solid #fff;background:var(--sea);
     box-shadow:0 1px 4px rgba(0,0,0,.4);cursor:pointer;transition:transform .15s,background .15s}
+  .town-hit{width:100%;height:100%;display:grid;place-items:center;background:none;cursor:pointer}
+  .town-hit-wrap{background:none;border:none}
+  @media(hover:none){
+    /* slightly larger, easier-to-see dots on touch screens */
+    .town-dot{width:16px;height:16px;border-width:3px}
+    .town-dot.armed{transform:scale(1.4)}
+  }
   .town-dot:hover{transform:scale(1.35)}
   .town-dot.armed{background:var(--shell);transform:scale(1.45);box-shadow:0 0 0 4px rgba(246,192,73,.45)}
 </style>
@@ -168,15 +197,16 @@ async function save(){try{await window.storage.set(STORE_KEY,JSON.stringify(done
 const WALES_BOUNDS = L.latLngBounds([51.30, -5.45], [53.50, -2.60]);
 const map=L.map('map',{
   zoomControl:true,
-  maxBounds: WALES_BOUNDS,
-  maxBoundsViscosity: 1.0,
-  minZoom: 7,
-  maxZoom: 15
+  maxBounds: L.latLngBounds([50.9, -6.1], [53.9, -2.1]), // a little breathing room around Wales
+  maxBoundsViscosity: 0.85,
+  minZoom: 6,
+  maxZoom: 15,
+  tap:true
 }).setView([52.4,-4.0],7);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© OpenStreetMap',maxZoom:17,bounds:WALES_BOUNDS
 }).addTo(map);
-map.setMaxBounds(WALES_BOUNDS);
+map.setMaxBounds(L.latLngBounds([50.9, -6.1], [53.9, -2.1]));
 
 // ---- Real Wales Coast Path geometry (reprojected from OS National Grid data) ----
 const coastLines={}; // authority -> array of {poly, status}
@@ -240,16 +270,27 @@ function colorForTown(name){
   for(const sec of ROUTE){ for(const l of sec.legs){ if(l.from===name||l.to===name) return sec.color; } }
   return '#1f5f72';
 }
+// Build a town marker icon: a small visible dot centred in a larger
+// transparent hit area so it's easy to tap on a phone.
+const HIT=38; // px tap target
+function townIcon(color,isArmed){
+  const dot=document.createElement('div');
+  dot.className='town-dot'+(isArmed?' armed':'');
+  if(!isArmed) dot.style.background=color;
+  const wrap=document.createElement('div');
+  wrap.className='town-hit';
+  wrap.appendChild(dot);
+  return L.divIcon({html:wrap.outerHTML,className:'town-hit-wrap',
+    iconSize:[HIT,HIT],iconAnchor:[HIT/2,HIT/2]});
+}
 function buildTowns(){
   const seen=new Set();
   legs.forEach(l=>{
     [ [l.from,l.path[0]], [l.to,l.path[l.path.length-1]] ].forEach(([name,coord])=>{
       if(seen.has(name)) return; seen.add(name);
       const color=colorForTown(name);
-      const el=document.createElement('div');el.className='town-dot';el.style.background=color;
-      const icon=L.divIcon({html:el.outerHTML,iconSize:[13,13],iconAnchor:[6.5,6.5]});
-      const marker=L.marker(coord,{icon}).addTo(map);
-      marker.bindTooltip(name,{className:'town-label',direction:'top',offset:[0,-6]});
+      const marker=L.marker(coord,{icon:townIcon(color,false)}).addTo(map);
+      marker.bindTooltip(name,{className:'town-label',direction:'top',offset:[0,-10]});
       marker.on('click',()=>onTownClick(name));
       const rec={name,marker,color};
       townMarkers.push(rec); townByName[name]=rec;
@@ -259,9 +300,7 @@ function buildTowns(){
 let armed=null;
 function setIcon(name,isArmed){
   const tm=townByName[name];if(!tm)return;
-  const el=document.createElement('div');el.className='town-dot'+(isArmed?' armed':'');
-  if(!isArmed)el.style.background=tm.color;
-  tm.marker.setIcon(L.divIcon({html:el.outerHTML,iconSize:[13,13],iconAnchor:[6.5,6.5]}));
+  tm.marker.setIcon(townIcon(tm.color,isArmed));
 }
 function onTownClick(name){
   if(armed===name){setIcon(name,false);armed=null;return;}
@@ -394,6 +433,12 @@ importFile.addEventListener('change',e=>{
 (async()=>{
   await load();drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
   map.fitBounds(WALES_BOUNDS);
+  // Mobile browsers settle their layout (address bar, dvh) after first paint;
+  // recalc the map size so tiles fill the container instead of leaving grey gaps.
+  const refit=()=>{ map.invalidateSize(); map.fitBounds(WALES_BOUNDS); };
+  setTimeout(refit,200);
+  window.addEventListener('resize',()=>map.invalidateSize());
+  window.addEventListener('orientationchange',()=>setTimeout(refit,300));
 })();
 </script>
 <!-- GoatCounter analytics (privacy-friendly, no cookies) -->
