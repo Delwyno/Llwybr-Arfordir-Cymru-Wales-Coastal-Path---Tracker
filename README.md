@@ -35,35 +35,6 @@ Your progress lives in **your browser on the device you're using.** It is not sh
 
 This is how you move your walk from your phone to your laptop (or vice versa): export on one, transfer the file, import on the other. Because there are no accounts, several people can each use the same page and keep their own separate progress simply by keeping their own export files.
 
-## Hosting it on GitHub Pages
-
-The whole app is one HTML file, so hosting is simple and free.
-
-1. Create a repository and add **`wales-coast-path-map-tracker_7.html`** (rename it to `index.html` if you want it to be the default page) and **`wales-coast-path-share-card.png`**.
-2. In the repository, go to **Settings → Pages**.
-3. Under **Build and deployment**, set **Source** to *Deploy from a branch*, pick your branch (usually `main`) and the `/ (root)` folder, then **Save**.
-4. After a minute or two your site will be live at `https://YOURNAME.github.io/REPO/`.
-
-The app loads its map tiles over HTTPS, which matches GitHub Pages, so there are no mixed-content problems.
-
-### Making the share image appear on links
-
-When you paste your link into WhatsApp, Messages, Facebook, Slack and similar, you can have them show the preview card. Add these lines inside the `<head>` of the HTML, replacing the URL with your real address:
-
-```html
-<meta property="og:title" content="Wales Coast Path Tracker">
-<meta property="og:description" content="Tick off your walk along all 870 miles of the Welsh coastline.">
-<meta property="og:image" content="https://YOURNAME.github.io/REPO/wales-coast-path-share-card.png">
-<meta property="og:type" content="website">
-<meta name="twitter:card" content="summary_large_image">
-```
-
-Keep `wales-coast-path-share-card.png` in the same repository folder so that URL resolves.
-
-## Running it locally
-
-You don't need a server. Download the HTML file and double-click it, or open it in any modern browser. It needs an internet connection only to load the background map tiles; your progress and all the route data are already inside the file.
-
 ## How it works (under the hood)
 
 - The map is rendered with [Leaflet](https://leafletjs.com/) over [OpenStreetMap](https://www.openstreetmap.org/) tiles.
