@@ -95,10 +95,6 @@
   .stat-row .k{color:var(--ink-soft)} .stat-row .v{font-weight:700;color:var(--sea)}
   .stat-section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);
     margin:18px 0 6px}
-  .weather-box{margin-top:10px;padding:10px 12px;background:var(--sand);border:1px solid var(--line);
-    border-radius:10px;font-size:.8rem;color:var(--ink);display:flex;align-items:center;gap:10px}
-  .weather-box .wicon{font-size:1.4rem}
-  .weather-box .wtxt b{color:var(--sea)}
   .elev-btn{flex:0 0 auto;background:none;border:1px solid var(--line);border-radius:6px;
     width:26px;height:26px;font-size:.85rem;cursor:pointer;color:var(--ink-soft);line-height:1}
   .elev-btn:hover{background:var(--sand)}
@@ -106,8 +102,10 @@
   .elev-panel{display:none;padding:8px 10px 10px 40px;font-size:.72rem;color:var(--ink-soft)}
   .elev-panel.open{display:block}
   .elev-loading{font-style:italic}
-  .elev-svg{width:100%;max-width:260px;height:44px;display:block}
-  .elev-meta{margin-top:2px;font-weight:600;color:var(--sea)}
+  .elev-svg{width:100%;max-width:290px;height:76px;display:block}
+  .elev-meta{margin-top:4px;font-weight:700}
+  .elev-meta .diff-easy{color:#2e7d5b} .elev-meta .diff-moderate{color:#a9821e} .elev-meta .diff-strenuous{color:#d62828}
+  .elev-sub{font-weight:400;color:var(--ink-soft);margin-left:4px}
   .btn{flex:1;padding:9px;border-radius:9px;border:1px solid var(--line);background:#fff;
     color:var(--ink-soft);font-size:.71rem;font-weight:600;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
   .btn:hover{background:var(--sand);color:var(--ink)}
@@ -196,7 +194,6 @@
   </div>
   <div class="panel">
     <div class="hint"><b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Faint dashed lines are the official alternative routes. Saves automatically.</div>
-    <div id="weatherBox" class="weather-box" style="display:none"></div>
     <h2>Sections &amp; day legs</h2>
     <div id="secList"></div>
     <div class="panel-actions">
@@ -420,7 +417,7 @@ function toggleLeg(key){
   line.setStyle(styleFor(l));
   if(done[key]) line.bringToFront();
   line.setTooltipContent(`${l.from} → ${l.to} · ${l.miles} mi${done[key]?' · ✓ walked '+done[key]:''}`);
-  renderPanel();updateStats();refreshCoast();loadWeather();
+  renderPanel();updateStats();refreshCoast();
 }
 
 const secEl=document.getElementById('secList');
@@ -459,8 +456,10 @@ function renderPanel(){
           elevPanel.innerHTML='<span class="elev-loading">Loading elevation…</span>';
           try{
             const prof=await getElevationProfile(l);
+            const diffClass='diff-'+prof.difficulty.toLowerCase();
             elevPanel.innerHTML=renderElevSVG(prof)+
-              `<div class="elev-meta">${prof.difficulty} · ↑${prof.ascent}m ↓${prof.descent}m over ${l.miles} mi</div>`;
+              `<div class="elev-meta"><span class="${diffClass}">${prof.difficulty}</span>`+
+              `<span class="elev-sub">↑${prof.ascent}m ↓${prof.descent}m over ${l.miles} mi</span></div>`;
             elevBtn.classList.add('has-data'); elevBtn.title='Elevation: '+prof.difficulty;
             elevPanel.dataset.loaded='1';
           }catch(err){
@@ -681,21 +680,39 @@ map.on('locationerror',()=>{
 
 // --- Elevation profile per leg (on demand, free no-key API: open-meteo.com) ---
 const elevCache={};
+function dist2(a,b){ return Math.hypot(a[0]-b[0],a[1]-b[1]); }
+// Sample n points at EQUAL distance intervals along the leg's real path (not just
+// nearest existing vertices) so the profile accurately represents the ground —
+// dense, wiggly stretches don't over-sample and straight stretches don't under-sample.
 function sampleLegPoints(l,n){
   const g=legPath(l);
-  if(g.length<=n) return g;
-  const pts=[]; for(let i=0;i<n;i++){ pts.push(g[Math.round(i*(g.length-1)/(n-1))]); }
-  return pts;
+  if(g.length<2) return {pts:g,dists:[0]};
+  const seg=[0]; for(let i=1;i<g.length;i++) seg.push(seg[i-1]+dist2(g[i-1],g[i]));
+  const total=seg[seg.length-1]||1;
+  const pts=[],dists=[];
+  for(let k=0;k<n;k++){
+    const target=(k/(n-1))*total;
+    let i=1; while(i<seg.length-1 && seg[i]<target) i++;
+    const segLen=seg[i]-seg[i-1]||1;
+    const t=Math.max(0,Math.min(1,(target-seg[i-1])/segLen));
+    const p=[g[i-1][0]+t*(g[i][0]-g[i-1][0]), g[i-1][1]+t*(g[i][1]-g[i-1][1])];
+    pts.push(p); dists.push(target/total*l.miles);
+  }
+  return {pts,dists};
 }
 async function getElevationProfile(l){
   if(elevCache[l.key]) return elevCache[l.key];
   try{
     const stored=await window.storage.get('elev:'+l.key);
-    if(stored&&stored.value){ const prof=JSON.parse(stored.value); elevCache[l.key]=prof; return prof; }
+    if(stored&&stored.value){
+      const prof=JSON.parse(stored.value);
+      if(prof.dists && typeof prof.miles==='number'){ elevCache[l.key]=prof; return prof; }
+      // else: older cached shape from before the profile chart was improved — refetch fresh below
+    }
   }catch(e){}
-  const pts=sampleLegPoints(l,10);
-  const lats=pts.map(p=>p[0].toFixed(4)).join(',');
-  const lons=pts.map(p=>p[1].toFixed(4)).join(',');
+  const {pts,dists}=sampleLegPoints(l,20);
+  const lats=pts.map(p=>p[0].toFixed(5)).join(',');
+  const lons=pts.map(p=>p[1].toFixed(5)).join(',');
   const res=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`);
   if(!res.ok) throw new Error('elevation fetch failed');
   const data=await res.json();
@@ -708,48 +725,34 @@ async function getElevationProfile(l){
   ascent=Math.round(ascent); descent=Math.round(descent);
   const perMile=ascent/Math.max(l.miles,1);
   const difficulty = perMile<20? 'Easy' : perMile<60? 'Moderate' : 'Strenuous';
-  const prof={elevations,ascent,descent,difficulty};
+  const prof={elevations,dists,ascent,descent,difficulty,miles:l.miles};
   elevCache[l.key]=prof;
   try{ await window.storage.set('elev:'+l.key, JSON.stringify(prof)); }catch(e){}
   return prof;
 }
+const DIFF_COLOR={Easy:'#2e7d5b',Moderate:'#c9a227',Strenuous:'#d62828'};
 function renderElevSVG(prof){
-  const els=prof.elevations; const w=260,h=54,pad=4;
-  const min=Math.min(...els), max=Math.max(...els); const span=Math.max(max-min,1);
-  const pts=els.map((e,i)=>{
-    const x=pad+(i/(els.length-1))*(w-2*pad);
-    const y=h-pad-((e-min)/span)*(h-2*pad);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return `<svg viewBox="0 0 ${w} ${h}" class="elev-svg"><polyline points="${pts}" fill="none" stroke="#1f5f72" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
-}
-
-// --- Weather for the next unwalked leg (no API key needed: open-meteo.com) ---
-const WMO={0:['☀️','Clear sky'],1:['🌤','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
-  45:['🌫','Fog'],48:['🌫','Fog'],51:['🌦','Light drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy drizzle'],
-  61:['🌦','Light rain'],63:['🌧','Rain'],65:['🌧','Heavy rain'],71:['🌨','Light snow'],73:['🌨','Snow'],
-  75:['❄️','Heavy snow'],80:['🌦','Rain showers'],81:['🌧','Rain showers'],82:['⛈','Violent showers'],
-  95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm, hail'],99:['⛈','Thunderstorm, hail']};
-function nextUnwalkedLeg(){
-  return legs.find(l=>!done[l.key]) || null;
-}
-async function loadWeather(){
-  const box=document.getElementById('weatherBox');
-  const target=nextUnwalkedLeg();
-  if(!target){ box.style.display='none'; return; }
-  const mid=target.path[Math.floor(target.path.length/2)] || target.path[0];
-  try{
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${mid[0].toFixed(3)}&longitude=${mid[1].toFixed(3)}&current_weather=true`;
-    const res=await fetch(url);
-    if(!res.ok) throw new Error('bad response');
-    const data=await res.json();
-    const cw=data.current_weather;
-    const info=WMO[cw.weathercode] || ['🌡','Weather'];
-    box.innerHTML=`<span class="wicon">${info[0]}</span><span class="wtxt">Next up: <b>${target.from} → ${target.to}</b> — ${Math.round(cw.temperature)}°C, ${info[1]}</span>`;
-    box.style.display='flex';
-  }catch(e){
-    box.style.display='none'; // fail silently — weather is a nice-to-have, not essential
-  }
+  const els=prof.elevations, dists=prof.dists;
+  const w=280,h=90,padL=32,padR=8,padT=10,padB=18;
+  const min=Math.min(...els), max=Math.max(...els);
+  const span=Math.max(max-min,5); // avoid a flat, meaningless chart on very level ground
+  const plotW=w-padL-padR, plotH=h-padT-padB;
+  const x=i=>padL+(dists[i]/prof.miles)*plotW;
+  const y=e=>padT+plotH-((e-min)/span)*plotH;
+  const linePts=els.map((e,i)=>`${x(i).toFixed(1)},${y(e).toFixed(1)}`).join(' ');
+  const areaPts=`${padL},${padT+plotH} ${linePts} ${padL+plotW},${padT+plotH}`;
+  const col=DIFF_COLOR[prof.difficulty]||'#1f5f72';
+  const maxIdx=els.indexOf(max), minIdx=els.indexOf(min);
+  return `<svg viewBox="0 0 ${w} ${h}" class="elev-svg">
+    <line x1="${padL}" y1="${padT+plotH}" x2="${padL+plotW}" y2="${padT+plotH}" stroke="#ddd4c4" stroke-width="1"/>
+    <polygon points="${areaPts}" fill="${col}" fill-opacity="0.14"/>
+    <polyline points="${linePts}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${x(maxIdx).toFixed(1)}" cy="${y(max).toFixed(1)}" r="2.6" fill="${col}"/>
+    <text x="${padL-4}" y="${(padT+4).toFixed(1)}" text-anchor="end" font-size="8" fill="#5c6b67">${Math.round(max)}m</text>
+    <text x="${padL-4}" y="${(padT+plotH).toFixed(1)}" text-anchor="end" font-size="8" fill="#5c6b67">${Math.round(min)}m</text>
+    <text x="${padL}" y="${h-4}" text-anchor="start" font-size="8" fill="#5c6b67">0 mi</text>
+    <text x="${padL+plotW}" y="${h-4}" text-anchor="end" font-size="8" fill="#5c6b67">${prof.miles} mi</text>
+  </svg>`;
 }
 
 // --- First-tap hint: teach the two-tap mechanic ---
@@ -764,7 +767,6 @@ function showTapHint(msg){
 (async()=>{
   await load();drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
   map.fitBounds(WALES_BOUNDS);
-  loadWeather();
   // Mobile browsers settle their layout (address bar, dvh) after first paint;
   // recalc the map size so tiles fill the container instead of leaving grey gaps.
   const refit=()=>{ map.invalidateSize(); map.fitBounds(WALES_BOUNDS); };
