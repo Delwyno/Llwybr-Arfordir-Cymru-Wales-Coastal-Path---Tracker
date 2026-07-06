@@ -93,10 +93,15 @@
   .overlay-close:hover{background:var(--sand)}
   .stat-row{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:.88rem}
   .stat-row .k{color:var(--ink-soft)} .stat-row .v{font-weight:700;color:var(--sea)}
+  .prog-svg{width:100%;height:auto;margin-top:4px}
   .stat-section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);
     margin:18px 0 6px}
-  .elev-btn{flex:0 0 auto;background:none;border:1px solid var(--line);border-radius:6px;
+  .elev-btn,.note-btn{flex:0 0 auto;background:none;border:1px solid var(--line);border-radius:6px;
     width:26px;height:26px;font-size:.85rem;cursor:pointer;color:var(--ink-soft);line-height:1}
+  .note-btn{opacity:.45}
+  .note-btn.has-note{opacity:1;border-color:var(--shell,#c9a227);background:#fdf6e3}
+  .leg-note{padding:2px 12px 6px 41px;font-size:.72rem;font-style:italic;color:var(--ink-soft);
+    white-space:pre-wrap;word-break:break-word}
   .elev-btn:hover{background:var(--sand)}
   .elev-btn.has-data{border-color:var(--sea);color:var(--sea)}
   .elev-panel{display:none;padding:8px 10px 10px 40px;font-size:.72rem;color:var(--ink-soft)}
@@ -208,6 +213,9 @@
       <button class="btn" id="statsBtn">📊 Stats</button>
       <button class="btn" id="printBtn">🖨 Print summary</button>
     </div>
+    <div class="panel-actions">
+      <button class="btn" id="gpxBtn">🥾 GPX route (for OS Maps / Garmin)</button>
+    </div>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none">
     <div class="io-note" id="ioNote"></div>
   </div>
@@ -254,6 +262,12 @@ ROUTE.forEach(sec=>{
 });
 const TOTAL=legs.reduce((s,l)=>s+l.miles,0);
 
+// Storage shim: window.storage exists only in Claude's preview; on a normal
+// web host (e.g. GitHub Pages) we fall back to the browser's localStorage.
+const appStore=(typeof window!=='undefined' && window.storage && window.storage.get)? window.storage : {
+  async get(k){ try{ const v=localStorage.getItem(k); return v==null? null : {value:v}; }catch(e){ return null; } },
+  async set(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+};
 const STORE_KEY='wcp_map_v3';
 const OLD_STORE_KEY='wcp_map_v2';
 let done={};
@@ -262,12 +276,12 @@ let done={};
 const LEGACY_V2_MAP={"north_0":["north:chester-border>saltney","north:saltney>queensferry","north:queensferry>connah-s-quay"],"north_1":["north:connah-s-quay>flint"],"north_2":["north:flint>greenfield"],"north_3":["north:greenfield>mostyn"],"north_4":["north:mostyn>talacre","north:talacre>prestatyn"],"north_5":["north:prestatyn>rhyl"],"north_6":["north:rhyl>abergele-pensarn"],"north_7":["north:abergele-pensarn>llanddulas","north:llanddulas>colwyn-bay"],"north_8":["north:colwyn-bay>rhos-on-sea"],"north_9":["north:rhos-on-sea>llandudno"],"north_10":["north:llandudno>conwy"],"north_11":["north:conwy>penmaenmawr"],"north_12":["north:penmaenmawr>llanfairfechan"],"north_13":["north:llanfairfechan>abergwyngregyn","north:abergwyngregyn>bangor"],"north_14":["north:bangor>menai-bridge"],"anglesey_0":["anglesey:menai-bridge>llandegfan","anglesey:llandegfan>beaumaris"],"anglesey_1":["anglesey:beaumaris>llangoed","anglesey:llangoed>penmon"],"anglesey_2":["anglesey:penmon>fedw-fawr","anglesey:fedw-fawr>llanddona","anglesey:llanddona>benllech","anglesey:benllech>moelfre"],"anglesey_3":["anglesey:moelfre>dulas","anglesey:dulas>llaneilian","anglesey:llaneilian>amlwch"],"anglesey_4":["anglesey:amlwch>bull-bay","anglesey:bull-bay>cemaes"],"anglesey_5":["anglesey:cemaes>cemlyn-bay","anglesey:cemlyn-bay>church-bay"],"anglesey_6":["anglesey:church-bay>llanfachraeth","anglesey:llanfachraeth>holyhead"],"anglesey_7":["anglesey:holyhead>south-stack","anglesey:south-stack>porth-dafarch","anglesey:porth-dafarch>trearddur-bay"],"anglesey_8":["anglesey:trearddur-bay>rhoscolyn","anglesey:rhoscolyn>rhosneigr"],"anglesey_9":["anglesey:rhosneigr>aberffraw"],"anglesey_10":["anglesey:aberffraw>malltraeth","anglesey:malltraeth>newborough"],"anglesey_11":["anglesey:newborough>pen-l-n","anglesey:pen-l-n>dwyran","anglesey:dwyran>brynsiencyn"],"anglesey_12":["anglesey:brynsiencyn>llanfairpwll","anglesey:llanfairpwll>menai-bridge"],"anglesey_13":["anglesey:menai-bridge>y-felinheli","anglesey:y-felinheli>caernarfon"],"llyn_0":["llyn:caernarfon>llanfaglan","llyn:llanfaglan>saron","llyn:saron>saron-south-west","llyn:saron-south-west>dinas-dinlle"],"llyn_1":["llyn:dinas-dinlle>trefor"],"llyn_2":["llyn:trefor>nant-gwrtheyrn","llyn:nant-gwrtheyrn>pistyll","llyn:pistyll>nefyn"],"llyn_3":["llyn:nefyn>morfa-nefyn","llyn:morfa-nefyn>tudweiliog","llyn:tudweiliog>porthor","llyn:porthor>aberdaron"],"llyn_4":["llyn:aberdaron>rhiw","llyn:rhiw>porth-neigwl","llyn:porth-neigwl>abersoch"],"llyn_5":["llyn:abersoch>llanbedrog","llyn:llanbedrog>pwllheli"],"llyn_6":["llyn:pwllheli>abererch","llyn:abererch>llanystumdwy","llyn:llanystumdwy>criccieth"],"llyn_7":["llyn:criccieth>porthmadog"],"llyn_8":["llyn:porthmadog>penrhyndeudraeth","llyn:penrhyndeudraeth>harlech"],"llyn_9":["llyn:harlech>llandanwg","llyn:llandanwg>llanbedr","llyn:llanbedr>dyffryn-ardudwy","llyn:dyffryn-ardudwy>barmouth"],"llyn_10":["llyn:barmouth>fairbourne"],"llyn_11":["llyn:fairbourne>friog","llyn:friog>fairbourne-llangelynin-mid","llyn:fairbourne-llangelynin-mid>fairbourne-llangelynin-west","llyn:fairbourne-llangelynin-west>llangelynin","llyn:llangelynin>llwyngwril"],"llyn_12":["llyn:llwyngwril>tonfanau","llyn:tonfanau>tywyn"],"llyn_13":["llyn:tywyn>aberdyfi"],"llyn_14":["llyn:aberdyfi>cwrt","llyn:cwrt>pennal","llyn:pennal>machynlleth"],"llyn_15":["llyn:machynlleth>derwenlas","llyn:derwenlas>furnace","llyn:furnace>tre-r-dd-l","llyn:tre-r-dd-l>borth"],"cered_0":["cered:borth>wallog","cered:wallog>clarach"],"cered_1":["cered:clarach>aberystwyth"],"cered_2":["cered:aberystwyth>morfa-bychan","cered:morfa-bychan>penderi-cliffs","cered:penderi-cliffs>llanrhystud"],"cered_3":["cered:llanrhystud>llanon","cered:llanon>aberarth","cered:aberarth>aberaeron"],"cered_4":["cered:aberaeron>cei-bach","cered:cei-bach>new-quay"],"cered_5":["cered:new-quay>cwmtydu","cered:cwmtydu>ynys-lochtyn","cered:ynys-lochtyn>llangrannog"],"cered_6":["cered:llangrannog>penbryn","cered:penbryn>aberporth"],"cered_7":["cered:aberporth>aberporth-mwnt-mid","cered:aberporth-mwnt-mid>mwnt"],"cered_8":["cered:mwnt>cardigan"],"cered_9":["cered:cardigan>st-dogmaels"],"pembs_0":["pembs:st-dogmaels>moylgrove","pembs:moylgrove>moylgrove-newport-pembs-mid","pembs:moylgrove-newport-pembs-mid>newport-pembs"],"pembs_1":["pembs:newport-pembs>cwm-yr-eglwys","pembs:cwm-yr-eglwys>dinas-cross"],"pembs_2":["pembs:dinas-cross>fishguard"],"pembs_3":["pembs:fishguard>carregwastad-point","pembs:carregwastad-point>strumble-head"],"pembs_4":["pembs:strumble-head>pwll-deri","pembs:pwll-deri>abermawr","pembs:abermawr>abercastle"],"pembs_5":["pembs:abercastle>abercastle-trefin-mid","pembs:abercastle-trefin-mid>trefin","pembs:trefin>porthgain"],"pembs_6":["pembs:porthgain>abereiddi","pembs:abereiddi>whitesands-bay","pembs:whitesands-bay>st-davids"],"pembs_7":["pembs:st-davids>caerfai-bay","pembs:caerfai-bay>solva"],"pembs_8":["pembs:solva>solva-newgale-mid","pembs:solva-newgale-mid>newgale"],"pembs_9":["pembs:newgale>nolton-haven","pembs:nolton-haven>broad-haven"],"pembs_10":["pembs:broad-haven>st-brides","pembs:st-brides>marloes"],"pembs_11":["pembs:marloes>martin-s-haven","pembs:martin-s-haven>marloes-sands","pembs:marloes-sands>st-ann-s-head-north-west","pembs:st-ann-s-head-north-west>st-ann-s-head","pembs:st-ann-s-head>dale"],"pembs_12":["pembs:dale>st-ishmael-s","pembs:st-ishmael-s>sandy-haven","pembs:sandy-haven>milford-haven"],"pembs_13":["pembs:milford-haven>neyland","pembs:neyland>pembroke"],"pembs_14":["pembs:pembroke>monkton","pembs:monkton>pwllcrochan","pembs:pwllcrochan>angle-bay","pembs:angle-bay>angle","pembs:angle>west-angle-bay","pembs:west-angle-bay>west-angle-bay-south-east","pembs:west-angle-bay-south-east>freshwater-west","pembs:freshwater-west>castlemartin","pembs:castlemartin>stack-rocks","pembs:stack-rocks>st-govan-s","pembs:st-govan-s>broad-haven-south","pembs:broad-haven-south>stackpole"],"pembs_15":["pembs:stackpole>freshwater-east","pembs:freshwater-east>manorbier"],"pembs_16":["pembs:manorbier>lydstep","pembs:lydstep>tenby"],"pembs_17":["pembs:tenby>saundersfoot"],"pembs_18":["pembs:saundersfoot>amroth"],"pembs_19":["pembs:amroth>pendine"],"carm_0":["carm:pendine>laugharne"],"carm_1":["carm:laugharne>taf-estuary-lower","carm:taf-estuary-lower>laugharne-st-clears-mid","carm:laugharne-st-clears-mid>taf-estuary-upper","carm:taf-estuary-upper>st-clears"],"carm_2":["carm:st-clears>llansteffan","carm:llansteffan>carmarthen"],"carm_3":["carm:carmarthen>carmarthen-ferryside-mid","carm:carmarthen-ferryside-mid>ferryside"],"carm_4":["carm:ferryside>kidwelly"],"carm_5":["carm:kidwelly>pembrey","carm:pembrey>burry-port"],"carm_6":["carm:burry-port>llanelli"],"carm_7":["carm:llanelli>machynys","carm:machynys>loughor"],"carm_8":["carm:loughor>penclawdd"],"gower_0":["gower:penclawdd>crofty-north-east","gower:crofty-north-east>crofty","gower:crofty>llanrhidian"],"gower_1":["gower:llanrhidian>llanmadoc","gower:llanmadoc>broughton-bay","gower:broughton-bay>llangennith"],"gower_2":["gower:llangennith>rhossili"],"gower_3":["gower:rhossili>paviland","gower:paviland>port-eynon"],"gower_4":["gower:port-eynon>oxwich"],"gower_5":["gower:oxwich>nicholaston","gower:nicholaston>three-cliffs-bay"],"gower_6":["gower:three-cliffs-bay>pwlldu-bay","gower:pwlldu-bay>caswell-bay","gower:caswell-bay>mumbles"],"gower_7":["gower:mumbles>blackpill","gower:blackpill>swansea-marina","gower:swansea-marina>swansea"],"south_0":["south:swansea>briton-ferry","south:briton-ferry>aberavon","south:aberavon>port-talbot"],"south_1":["south:port-talbot>margam","south:margam>kenfig","south:kenfig>porthcawl"],"south_2":["south:porthcawl>ogmore-by-sea"],"south_3":["south:ogmore-by-sea>southerndown","south:southerndown>nash-point","south:nash-point>llantwit-major"],"south_4":["south:llantwit-major>aberthaw","south:aberthaw>rhoose","south:rhoose>barry"],"south_5":["south:barry>sully","south:sully>penarth"],"south_6":["south:penarth>cardiff"],"south_7":["south:cardiff>lamby","south:lamby>peterstone-wentloog","south:peterstone-wentloog>newport"],"south_8":["south:newport>nash","south:nash>goldcliff","south:goldcliff>redwick","south:redwick>caldicot"],"south_9":["south:caldicot>sudbrook","south:sudbrook>chepstow"]};
 async function load(){
   try{
-    const r=await window.storage.get(STORE_KEY);
+    const r=await appStore.get(STORE_KEY);
     if(r&&r.value){ done=normalizeDone(JSON.parse(r.value)); return; }
   }catch(e){}
   // No v3 save yet — migrate a v2 (positional-id) save so progress isn't lost.
   try{
-    const old=await window.storage.get(OLD_STORE_KEY);
+    const old=await appStore.get(OLD_STORE_KEY);
     if(old&&old.value){
       const od=JSON.parse(old.value); const migrated={};
       Object.keys(od).forEach(k=>{ if(od[k]){ const nks=LEGACY_V2_MAP[k]; if(nks) nks.forEach(nk=>migrated[nk]=true); } });
@@ -287,7 +301,11 @@ function normalizeDone(obj){
   });
   return out;
 }
-async function save(){try{await window.storage.set(STORE_KEY,JSON.stringify(done));}catch(e){}}
+async function save(){try{await appStore.set(STORE_KEY,JSON.stringify(done));}catch(e){}}
+const NOTES_KEY='wcp_notes_v1';
+let notes={};
+async function loadNotes(){try{const r=await appStore.get(NOTES_KEY);if(r&&r.value)notes=JSON.parse(r.value);}catch(e){notes={};}}
+async function saveNotes(){try{await appStore.set(NOTES_KEY,JSON.stringify(notes));}catch(e){}}
 
 // Wales bounding box (tight) — keeps the view locked on Wales
 const WALES_BOUNDS = L.latLngBounds([51.30, -5.45], [53.50, -2.60]);
@@ -443,6 +461,7 @@ function renderPanel(){
       const d=!!done[l.key];const row=document.createElement('div');row.className='leg'+(d?' done':'');
       row.innerHTML=`<span class="leg-check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></span>
         <span class="leg-txt">${l.from} → ${l.to}</span>
+        <button class="note-btn${notes[l.key]?' has-note':''}" type="button" title="${notes[l.key]?'Edit note':'Add a note'}">📝</button>
         <button class="elev-btn" type="button" title="Elevation profile">⛰</button>
         <span class="leg-m">${l.miles} mi</span>`;
       row.addEventListener('click',e=>{e.stopPropagation();toggleLeg(l.key);
@@ -467,7 +486,23 @@ function renderPanel(){
           }
         }
       });
-      box.appendChild(row); box.appendChild(elevPanel);
+      const noteBtn=row.querySelector('.note-btn');
+      noteBtn.addEventListener('click',e=>{
+        e.stopPropagation();
+        const cur=notes[l.key]||'';
+        const txt=prompt(`Note for ${l.from} → ${l.to}:`,cur);
+        if(txt===null) return;              // cancelled
+        if(txt.trim()===''){ delete notes[l.key]; }
+        else notes[l.key]=txt.trim().slice(0,500);
+        saveNotes(); renderPanel();
+      });
+      box.appendChild(row);
+      if(notes[l.key]){
+        const noteLine=document.createElement('div'); noteLine.className='leg-note';
+        noteLine.textContent='📝 '+notes[l.key];
+        box.appendChild(noteLine);
+      }
+      box.appendChild(elevPanel);
     });
     wrap.querySelector('.sec-head').addEventListener('click',()=>{openState[sec.id]=!openState[sec.id];renderPanel();});
     secEl.appendChild(wrap);
@@ -493,6 +528,36 @@ document.getElementById('expandBtn').addEventListener('click',e=>{
   const anyClosed=ROUTE.some(s=>!openState[s.id]);
   ROUTE.forEach(s=>openState[s.id]=anyClosed);
   e.target.textContent=anyClosed?'Collapse all':'Expand all';renderPanel();
+});
+
+// ---- GPX export (usable in OS Maps, Garmin, Komoot, Strava etc.) ----
+function xmlEsc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+document.getElementById('gpxBtn').addEventListener('click',()=>{
+  let gpx='<?xml version="1.0" encoding="UTF-8"?>\n';
+  gpx+='<gpx version="1.1" creator="Wales Coast Path Tracker" xmlns="http://www.topografix.com/GPX/1/1">\n';
+  gpx+='<metadata><name>Wales Coast Path</name><desc>Full route, one segment per leg. Generated from Ordnance Survey Wales Coast Path data.</desc></metadata>\n';
+  // waypoints: every town/junction once
+  const seen=new Set();
+  legs.forEach(l=>{
+    [[l.from,legPath(l)[0]],[l.to,legPath(l)[legPath(l).length-1]]].forEach(([name,c])=>{
+      if(seen.has(name))return; seen.add(name);
+      gpx+=`<wpt lat="${c[0]}" lon="${c[1]}"><name>${xmlEsc(name)}</name></wpt>\n`;
+    });
+  });
+  gpx+='<trk><name>Wales Coast Path</name>\n';
+  legs.forEach(l=>{
+    gpx+=`<trkseg><!-- ${xmlEsc(l.from)} to ${xmlEsc(l.to)}, ${l.miles} mi -->\n`;
+    legPath(l).forEach(p=>{ gpx+=`<trkpt lat="${p[0]}" lon="${p[1]}"/>`; });
+    gpx+='\n</trkseg>\n';
+  });
+  gpx+='</trk>\n</gpx>';
+  const blob=new Blob([gpx],{type:'application/gpx+xml'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='wales-coast-path.gpx';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  showNote('GPX downloaded — import it into OS Maps, Garmin Connect, Komoot or similar to navigate any leg.','ok');
 });
 
 // ---- Stats summary ----
@@ -526,11 +591,38 @@ function buildPrintSheet(){
       const d=done[l.key];
       const mark=d? '☑' : '☐';
       const dateStr=typeof d==='string'? ` (${d})` : '';
-      html+=`<li>${mark} ${l.from} → ${l.to} — ${l.miles} mi${dateStr}</li>`;
+      const noteStr=notes[l.key]? `<br><em style="color:#555">— ${notes[l.key]}</em>` : '';
+      html+=`<li>${mark} ${l.from} → ${l.to} — ${l.miles} mi${dateStr}${noteStr}</li>`;
     });
     html+='</ul>';
   });
   sheet.innerHTML=html;
+}
+function renderProgressChart(byDate){
+  const dates=Object.keys(byDate).sort();
+  if(dates.length<2) return '';       // needs at least two dated walking days
+  let cum=0; const pts=dates.map(d=>{ cum+=byDate[d].reduce((s,l)=>s+l.miles,0); return {d,cum}; });
+  const w=420,h=130,padL=38,padR=10,padT=10,padB=24;
+  const plotW=w-padL-padR, plotH=h-padT-padB;
+  const t0=new Date(dates[0]).getTime(), t1=new Date(dates[dates.length-1]).getTime();
+  const span=Math.max(t1-t0,1), maxC=pts[pts.length-1].cum;
+  const X=d=>padL+((new Date(d).getTime()-t0)/span)*plotW;
+  const Y=c=>padT+plotH-(c/maxC)*plotH;
+  const line=pts.map(p=>`${X(p.d).toFixed(1)},${Y(p.cum).toFixed(1)}`).join(' ');
+  const area=`${padL},${padT+plotH} ${line} ${X(pts[pts.length-1].d).toFixed(1)},${padT+plotH}`;
+  const fmt=d=>{const dt=new Date(d);return dt.toLocaleDateString(undefined,{month:'short',year:'2-digit'});};
+  return `<svg viewBox="0 0 ${w} ${h}" class="prog-svg">
+    <line x1="${padL}" y1="${padT+plotH}" x2="${padL+plotW}" y2="${padT+plotH}" stroke="#ddd4c4"/>
+    <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+plotH}" stroke="#ddd4c4"/>
+    <polygon points="${area}" fill="#1f5f72" fill-opacity="0.12"/>
+    <polyline points="${line}" fill="none" stroke="#1f5f72" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+    ${pts.map(p=>`<circle cx="${X(p.d).toFixed(1)}" cy="${Y(p.cum).toFixed(1)}" r="2.4" fill="#1f5f72"/>`).join('')}
+    <text x="${padL-5}" y="${padT+5}" text-anchor="end" font-size="9" fill="#5c6b67">${maxC}</text>
+    <text x="${padL-5}" y="${padT+plotH}" text-anchor="end" font-size="9" fill="#5c6b67">0</text>
+    <text x="${padL}" y="${h-6}" text-anchor="start" font-size="9" fill="#5c6b67">${fmt(dates[0])}</text>
+    <text x="${padL+plotW}" y="${h-6}" text-anchor="end" font-size="9" fill="#5c6b67">${fmt(dates[dates.length-1])}</text>
+    <text x="10" y="${padT+plotH/2}" font-size="8" fill="#5c6b67" transform="rotate(-90 10 ${padT+plotH/2})" text-anchor="middle">miles</text>
+  </svg>`;
 }
 function buildStatsHTML(){
   const walked=legs.filter(l=>done[l.key]);
@@ -566,6 +658,8 @@ function buildStatsHTML(){
   html+=row('Most recent walk', lastDate || '–');
   html+='<div class="stat-section-title">What\'s next</div>';
   html+=row('Closest to finishing', closest? `${closest} (${closestPct.toFixed(0)}%)` : 'All sections complete 🎉');
+  const chart=renderProgressChart(byDate);
+  if(chart){ html+='<div class="stat-section-title">Progress over time</div>'+chart; }
   return html;
 }
 
@@ -600,7 +694,8 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
     walker:name||null,
     exported:new Date().toISOString(),
     totalMiles:TOTAL, walkedMiles:miles, legsWalked:walked.length,
-    done // map of legId -> true
+    done, // map of legKey -> walk date (or true for pre-date saves)
+    notes // map of legKey -> free-text note
   };
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -641,6 +736,13 @@ importFile.addEventListener('change',e=>{
       const replace=Object.keys(done).length===0 ||
         confirm(`Import ${n} walked legs?\n\nOK = replace your current progress\nCancel = merge with what you already have`);
       if(replace){done=cleaned;} else {Object.assign(done,cleaned);}
+      // restore notes if the file carries them (only for legs that exist)
+      if(data.notes && typeof data.notes==='object'){
+        const nvalid={};
+        Object.keys(data.notes).forEach(k=>{ if(validKeys.has(k)&&typeof data.notes[k]==='string') nvalid[k]=data.notes[k].slice(0,500); });
+        if(replace) notes=nvalid; else Object.assign(notes,nvalid);
+        saveNotes();
+      }
       save(); redrawAllLegs();
       const who=data.walker?` for ${data.walker}`:'';
       showNote(`Imported ${n} legs${who}.`,'ok');
@@ -703,7 +805,7 @@ function sampleLegPoints(l,n){
 async function getElevationProfile(l){
   if(elevCache[l.key]) return elevCache[l.key];
   try{
-    const stored=await window.storage.get('elev:'+l.key);
+    const stored=await appStore.get('elev:'+l.key);
     if(stored&&stored.value){
       const prof=JSON.parse(stored.value);
       if(prof.dists && typeof prof.miles==='number'){ elevCache[l.key]=prof; return prof; }
@@ -727,7 +829,7 @@ async function getElevationProfile(l){
   const difficulty = perMile<20? 'Easy' : perMile<60? 'Moderate' : 'Strenuous';
   const prof={elevations,dists,ascent,descent,difficulty,miles:l.miles};
   elevCache[l.key]=prof;
-  try{ await window.storage.set('elev:'+l.key, JSON.stringify(prof)); }catch(e){}
+  try{ await appStore.set('elev:'+l.key, JSON.stringify(prof)); }catch(e){}
   return prof;
 }
 const DIFF_COLOR={Easy:'#2e7d5b',Moderate:'#c9a227',Strenuous:'#d62828'};
@@ -765,8 +867,12 @@ function showTapHint(msg){
 }
 
 (async()=>{
-  await load();drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
+  await load();await loadNotes();drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
   map.fitBounds(WALES_BOUNDS);
+  // Offline support: register the service worker (real web hosts only — needs http/https and the sw.js file alongside this page)
+  if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
   // Mobile browsers settle their layout (address bar, dvh) after first paint;
   // recalc the map size so tiles fill the container instead of leaving grey gaps.
   const refit=()=>{ map.invalidateSize(); map.fitBounds(WALES_BOUNDS); };
