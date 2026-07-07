@@ -207,6 +207,17 @@
   [data-theme="dark"] .note-btn.has-note{background:#3a3320}
   [data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9)}
   [data-theme="dark"] #locateBtn{background:#223031;color:var(--ink)}
+  #poiChips{position:absolute;top:10px;right:10px;z-index:1000;display:flex;flex-direction:column;gap:6px}
+  .poi-chip{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:#fff;
+    font-size:1.15rem;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.2);opacity:.55;line-height:1;padding:0}
+  .poi-chip.on{opacity:1;border-color:var(--sea);box-shadow:0 2px 10px rgba(31,95,114,.4)}
+  [data-theme="dark"] .poi-chip{background:#223031}
+  .poi-pop{font-size:.8rem;line-height:1.35}
+  .poi-pop b{color:var(--sea)} .poi-pop .poi-flag{color:var(--done);font-weight:600}
+  .poi-divicon{background:none;border:none}
+  .poi-dot{width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+    font-size:13px;background:#fff;border:1px solid var(--line);border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+  [data-theme="dark"] .poi-dot{background:#223031}
   .btn-install{border-color:var(--sea);color:var(--sea);font-weight:700}
   .install-steps{font-size:.86rem;line-height:1.55;color:var(--ink)}
   .install-steps h3{font-size:.85rem;margin:14px 0 6px;color:var(--sea)}
@@ -246,6 +257,11 @@
 <div class="main">
   <div id="map">
     <button id="locateBtn" title="Show my location">◎</button>
+    <div id="poiChips">
+      <button class="poi-chip" data-poi="parking" title="Car parks">🅿️</button>
+      <button class="poi-chip" data-poi="toilet" title="Public toilets">🚻</button>
+      <button class="poi-chip" data-poi="bus" title="Bus stops">🚌</button>
+    </div>
     <div id="tapHint"></div>
   </div>
   <div class="panel">
@@ -254,7 +270,7 @@
       <input id="townSearch" type="search" placeholder="Find a place… e.g. Llangrannog" autocomplete="off">
       <div id="searchResults" class="search-results"></div>
     </div>
-    <div class="hint"><b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Faint dashed lines are the official alternative routes. Saves automatically.</div>
+    <div class="hint"><b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Use the 🅿️ 🚻 🚌 buttons to show car parks, toilets and bus stops (zoom in to see them; community data, so check before relying on it). Saves automatically.</div>
     <h2>Sections &amp; day legs</h2>
     <div id="secList"></div>
     <div class="panel-actions">
@@ -950,7 +966,7 @@ const I18N={
  en:{
   hideList:'Hide list',showList:'Show list',
   searchPh:'Find a place… e.g. Llangrannog',
-  hintHTML:'<b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Faint dashed lines are the official alternative routes. Saves automatically.',
+  hintHTML:'<b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Use the 🅿️ 🚻 🚌 buttons to show car parks, toilets and bus stops (zoom in to see them; community data, so check before relying on it). Saves automatically.',
   sections:'Sections & day legs', ofMi:'of', mi:'mi', doneLbl:'done', legs:'legs',
   expandAll:'Expand all',collapseAll:'Collapse all',resetAll:'Reset all',
   exportBtn:'⬇ Export progress',importBtn:'⬆ Import progress',
@@ -971,6 +987,10 @@ const I18N={
   locFail:'Could not get your location — check location permissions for your browser.',
   printTitle:'Wales Coast Path — Progress Summary',printed:'Printed',
   installBtn:'📲 Install as app',installTitle:'Install as an app',
+  poiParking:'Car park',poiToilet:'Public toilet',poiBus:'Bus stop',
+  poiFree:'Free parking',poiAccessible:'♿ Accessible',poiPaid:'Charge applies',
+  poiZoomHint:'Zoom in to see parking, toilets and bus stops',
+  poiMissing:'Places data not found — make sure pois.json is uploaded alongside the app.',
   installNow:'Install now',installedNote:'✓ Already installed — you\'re using the app right now.',
   installIntro:'This site is a full app: once installed it gets its own icon, opens full-screen, and works offline.',
   iosH:'iPhone / iPad (Safari)',
@@ -1004,6 +1024,10 @@ const I18N={
   locFail:'Methu cael eich lleoliad — gwiriwch ganiatâd lleoliad eich porwr.',
   printTitle:'Llwybr Arfordir Cymru — Crynodeb Cynnydd',printed:'Argraffwyd',
   installBtn:'📲 Gosod fel ap',installTitle:'Gosod fel ap',
+  poiParking:'Maes parcio',poiToilet:'Toiledau cyhoeddus',poiBus:'Safle bws',
+  poiFree:'Parcio am ddim',poiAccessible:'♿ Hygyrch',poiPaid:'Codir tâl',
+  poiZoomHint:'Chwyddwch i mewn i weld meysydd parcio, toiledau a safleoedd bws',
+  poiMissing:'Data lleoedd heb ei ganfod — sicrhewch fod pois.json wedi\'i uwchlwytho.',
   installNow:'Gosod nawr',installedNote:'✓ Eisoes wedi\'i osod — rydych yn defnyddio\'r ap nawr.',
   installIntro:'Mae\'r wefan hon yn ap llawn: ar ôl ei gosod caiff ei heicon ei hun, mae\'n agor sgrin lawn, ac mae\'n gweithio all-lein.',
   iosH:'iPhone / iPad (Safari)',
@@ -1040,6 +1064,8 @@ function applyLang(){
   document.getElementById('statsTitle').textContent=t('yourProgress');
   document.getElementById('installBtn').textContent=t('installBtn');
   document.getElementById('installTitle').textContent=t('installTitle');
+  const pc={parking:'poiParking',toilet:'poiToilet',bus:'poiBus'};
+  document.querySelectorAll('.poi-chip').forEach(b=>{ b.title=t(pc[b.dataset.poi]); });
   renderPanel(); updateStats(); redrawAllLegs();
 }
 document.getElementById('langBtn').addEventListener('click',async()=>{
@@ -1109,6 +1135,69 @@ document.getElementById('themeBtn').addEventListener('click',async()=>{
   applyTheme(theme);
   try{ await appStore.set(THEME_KEY,theme); }catch(e){}
 });
+
+// ---- Points of interest (parking / toilets / bus stops) ----
+let POI=null;
+const poiState={parking:false,toilet:false,bus:false};
+const poiLayers={parking:[],toilet:[],bus:[]};
+const POI_MIN_ZOOM=13;         // only show markers when zoomed in this far
+const POI_ICON={parking:'🅿️',toilet:'🚻',bus:'🚌'};
+const POI_STATE_KEY='wcp_poi_layers';
+async function loadPOI(){
+  if(POI) return POI;
+  try{
+    const res=await fetch('pois.json');
+    if(res.ok){ POI=await res.json(); }
+  }catch(e){ POI=null; }
+  return POI;
+}
+function poiMarker(typ,p){
+  const html=`<div class="poi-dot poi-${typ}">${POI_ICON[typ]}</div>`;
+  const icon=L.divIcon({html,className:'poi-divicon',iconSize:[22,22],iconAnchor:[11,11]});
+  const m=L.marker([p.lat,p.lon],{icon});
+  let txt=`<div class="poi-pop"><b>${p.n?escapeHTML(p.n):poiTypeName(typ)}</b>`;
+  if(typ==='parking' && p.free===1) txt+=`<br><span class="poi-flag">${t('poiFree')}</span>`;
+  if(typ==='toilet'){
+    if(p.acc===1) txt+=`<br><span class="poi-flag">${t('poiAccessible')}</span>`;
+    if(p.fee===1) txt+=`<br>${t('poiPaid')}`;
+  }
+  txt+='</div>';
+  m.bindPopup(txt);
+  return m;
+}
+function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function poiTypeName(typ){ return typ==='parking'?t('poiParking'):typ==='toilet'?t('poiToilet'):t('poiBus'); }
+function renderPOI(){
+  const z=map.getZoom();
+  const bounds=map.getBounds();
+  ['parking','toilet','bus'].forEach(typ=>{
+    // clear existing
+    poiLayers[typ].forEach(m=>map.removeLayer(m)); poiLayers[typ]=[];
+    if(!poiState[typ] || !POI || z<POI_MIN_ZOOM) return;
+    let count=0;
+    for(const p of POI[typ]){
+      if(p.lat<bounds.getSouth()||p.lat>bounds.getNorth()||p.lon<bounds.getWest()||p.lon>bounds.getEast()) continue;
+      const m=poiMarker(typ,p); m.addTo(map); poiLayers[typ].push(m);
+      if(++count>600) break; // hard cap so a dense city view can't lock up
+    }
+  });
+}
+function updatePoiHint(){
+  // subtle cue when a layer is on but you're zoomed too far out to see them
+  const anyOn=poiState.parking||poiState.toilet||poiState.bus;
+  if(anyOn && map.getZoom()<POI_MIN_ZOOM){ showTapHint(t('poiZoomHint')); }
+}
+async function togglePOI(typ,btn){
+  poiState[typ]=!poiState[typ];
+  btn.classList.toggle('on',poiState[typ]);
+  if(poiState[typ]){ await loadPOI(); if(!POI){ showNote(t('poiMissing'),'err'); poiState[typ]=false; btn.classList.remove('on'); return; } }
+  try{ await appStore.set(POI_STATE_KEY,JSON.stringify(poiState)); }catch(e){}
+  renderPOI(); updatePoiHint();
+}
+document.querySelectorAll('.poi-chip').forEach(btn=>{
+  btn.addEventListener('click',()=>togglePOI(btn.dataset.poi,btn));
+});
+map.on('moveend zoomend',()=>{ if(poiState.parking||poiState.toilet||poiState.bus) renderPOI(); });
 
 // --- Locate me (handy when walking the path) ---
 let locMarker=null, locCircle=null, locOn=false;
@@ -1227,6 +1316,16 @@ function showTapHint(msg){
   drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
   if(LANG!=='en') applyLang();
   else document.getElementById('langBtn').textContent='Cym';
+  // restore any POI layers the user had switched on
+  try{
+    const r=await appStore.get(POI_STATE_KEY);
+    if(r&&r.value){
+      const saved=JSON.parse(r.value); let any=false;
+      ['parking','toilet','bus'].forEach(typ=>{ if(saved[typ]){ poiState[typ]=true; any=true;
+        const b=document.querySelector('.poi-chip[data-poi="'+typ+'"]'); if(b) b.classList.add('on'); } });
+      if(any){ await loadPOI(); renderPOI(); }
+    }
+  }catch(e){}
   map.fitBounds(WALES_BOUNDS);
   // Offline support: register the service worker (real web hosts only — needs http/https and the sw.js file alongside this page)
   if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){

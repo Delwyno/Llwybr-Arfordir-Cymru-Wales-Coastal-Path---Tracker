@@ -2,13 +2,14 @@
    Makes the app itself work offline (map tiles fill in when signal returns,
    and recently-viewed tiles are cached too). */
 
-const SHELL_CACHE = 'wcp-shell-v1';
+const SHELL_CACHE = 'wcp-shell-v2';
 const TILE_CACHE  = 'wcp-tiles-v1';
 const TILE_LIMIT  = 400; // max cached map tiles (roughly a few MB)
 
 const SHELL_URLS = [
   './',
   './index.html',
+  './pois.json',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
