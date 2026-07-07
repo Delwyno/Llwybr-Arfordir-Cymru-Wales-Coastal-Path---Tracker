@@ -168,6 +168,53 @@
   }
   .town-dot:hover{transform:scale(1.35)}
   .town-dot.armed{background:var(--shell);transform:scale(1.45);box-shadow:0 0 0 4px rgba(246,192,73,.45)}
+
+  /* --- header controls --- */
+  .hdr-ctrls{display:flex;gap:6px;margin-left:12px}
+  .ctrl-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;
+    border-radius:8px;min-width:34px;height:30px;font-size:.75rem;cursor:pointer;padding:0 7px}
+  .ctrl-btn:hover{background:rgba(255,255,255,.22)}
+  /* --- town search --- */
+  .search-wrap{position:relative;margin-bottom:10px}
+  #townSearch{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:9px;
+    font-size:.85rem;background:#fff;color:var(--ink)}
+  #townSearch:focus{outline:2px solid var(--sea);outline-offset:-1px}
+  .search-results{position:absolute;left:0;right:0;top:100%;z-index:1500;background:#fff;
+    border:1px solid var(--line);border-radius:9px;margin-top:3px;box-shadow:0 6px 18px rgba(0,0,0,.15);
+    max-height:250px;overflow-y:auto;display:none}
+  .search-results.open{display:block}
+  .search-hit{padding:9px 12px;font-size:.82rem;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+  .search-hit:hover,.search-hit.sel{background:var(--sand)}
+  .search-hit .sec-tag{font-size:.68rem;color:var(--ink-soft)}
+  /* --- mobile panel collapse --- */
+  .panel-toggle{display:none}
+  @media(max-width:760px){
+    .panel-toggle{display:block;width:100%;padding:9px;margin-bottom:10px;background:var(--sand);
+      border:1px solid var(--line);border-radius:9px;font-size:.8rem;color:var(--ink);cursor:pointer}
+    body.panel-min #map{height:calc(100dvh - 62px - 46px);flex:none}
+    body.panel-min .panel{flex:0 0 46px;overflow:hidden;padding-top:8px;padding-bottom:8px}
+  }
+  /* --- dark mode --- */
+  [data-theme="dark"]{
+    --sand:#243233; --paper:#1b2627; --ink:#e8ece9; --ink-soft:#9fb0ab; --line:#3a4a4a;
+  }
+  [data-theme="dark"] body, [data-theme="dark"] .panel{background:var(--paper)}
+  [data-theme="dark"] #townSearch,[data-theme="dark"] .search-results,
+  [data-theme="dark"] .overlay-card{background:#223031;color:var(--ink)}
+  [data-theme="dark"] .sec,[data-theme="dark"] .sec-head,[data-theme="dark"] .leg{background:#223031}
+  [data-theme="dark"] .sec-head:hover,[data-theme="dark"] .leg:hover,[data-theme="dark"] .search-hit:hover{background:#2c3d3e}
+  [data-theme="dark"] .btn{background:#223031;color:var(--ink-soft);border-color:var(--line)}
+  [data-theme="dark"] .note-btn.has-note{background:#3a3320}
+  [data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.9)}
+  [data-theme="dark"] #locateBtn{background:#223031;color:var(--ink)}
+  .btn-install{border-color:var(--sea);color:var(--sea);font-weight:700}
+  .install-steps{font-size:.86rem;line-height:1.55;color:var(--ink)}
+  .install-steps h3{font-size:.85rem;margin:14px 0 6px;color:var(--sea)}
+  .install-steps ol{padding-left:20px;margin:4px 0 10px}
+  .install-steps li{margin:4px 0}
+  .install-steps .muted{color:var(--ink-soft);font-size:.78rem}
+  .install-now{display:inline-block;margin:6px 0 12px;padding:10px 16px;background:var(--sea);color:#fff;
+    border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer}
   .print-only{display:none}
   @media print{
     body>*:not(#printSheet){display:none !important}
@@ -188,8 +235,12 @@
   </div>
   <div class="hdr-stats">
     <div class="hbar-track"><div class="hbar-fill" id="hbarFill"></div></div>
-    <div class="hdr-stat"><div class="n" id="hMiles">0</div><div class="l">of <span id="hTotal">0</span> mi</div></div>
-    <div class="hdr-stat"><div class="n" id="hPct">0%</div><div class="l">done</div></div>
+    <div class="hdr-stat"><div class="n" id="hMiles">0</div><div class="l" id="lblOf">of <span id="hTotal">0</span> mi</div></div>
+    <div class="hdr-stat"><div class="n" id="hPct">0%</div><div class="l" id="lblDone">done</div></div>
+  </div>
+  <div class="hdr-ctrls">
+    <button id="themeBtn" class="ctrl-btn" title="Light / dark">🌓</button>
+    <button id="langBtn" class="ctrl-btn" title="Cymraeg / English">Cym</button>
   </div>
 </header>
 <div class="main">
@@ -198,6 +249,11 @@
     <div id="tapHint"></div>
   </div>
   <div class="panel">
+    <button id="panelToggle" class="panel-toggle" aria-label="Show map / show list">▾ <span id="panelToggleTxt">Hide list</span></button>
+    <div class="search-wrap">
+      <input id="townSearch" type="search" placeholder="Find a place… e.g. Llangrannog" autocomplete="off">
+      <div id="searchResults" class="search-results"></div>
+    </div>
     <div class="hint"><b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Faint dashed lines are the official alternative routes. Saves automatically.</div>
     <h2>Sections &amp; day legs</h2>
     <div id="secList"></div>
@@ -215,6 +271,10 @@
     </div>
     <div class="panel-actions">
       <button class="btn" id="gpxBtn">🥾 GPX route (for OS Maps / Garmin)</button>
+      <button class="btn" id="shareImgBtn">📸 Share progress image</button>
+    </div>
+    <div class="panel-actions">
+      <button class="btn btn-install" id="installBtn">📲 Install as app</button>
     </div>
     <input type="file" id="importFile" accept="application/json,.json" style="display:none">
     <div class="io-note" id="ioNote"></div>
@@ -223,8 +283,15 @@
 <div id="statsOverlay" class="overlay">
   <div class="overlay-card">
     <button id="statsClose" class="overlay-close" aria-label="Close">✕</button>
-    <h2>Your progress</h2>
+    <h2 id="statsTitle">Your progress</h2>
     <div id="statsBody"></div>
+  </div>
+</div>
+<div id="installOverlay" class="overlay">
+  <div class="overlay-card">
+    <button id="installClose" class="overlay-close" aria-label="Close">✕</button>
+    <h2 id="installTitle">Install as an app</h2>
+    <div id="installBody"></div>
   </div>
 </div>
 <div id="printSheet" class="print-only"></div>
@@ -365,7 +432,8 @@ function styleFor(l){const d=!!done[l.key];
 function drawLegs(){
   legs.forEach(l=>{
     const line=L.polyline(legPath(l),styleFor(l)).addTo(map);
-    line.bindTooltip(`${l.from} → ${l.to} · ${l.miles} mi`,{sticky:true});
+    const walkedSfx=done[l.key]?' · '+t('walked')+(typeof done[l.key]==='string'?' '+done[l.key]:''):'';
+    line.bindTooltip(`${l.from} → ${l.to} · ${l.miles} mi${walkedSfx}`,{sticky:true});
     line.on('click',()=>toggleLeg(l.key));
     if(done[l.key]) line.bringToFront();
     legLines[l.id]=line;
@@ -424,17 +492,20 @@ function onTownClick(name){
     setIcon(armed,false);
   }
   armed=name; setIcon(name,true);
-  showTapHint('Now tap the next place along the coast to mark that stretch walked');
+  showTapHint(t('tapHint'));
 }
 
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function todayStr(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
 function toggleLeg(key){
   if(done[key]) delete done[key]; else done[key]=todayStr();
   save();
   const l=legs.find(x=>x.key===key);const line=legLines[l.id];
   line.setStyle(styleFor(l));
   if(done[key]) line.bringToFront();
-  line.setTooltipContent(`${l.from} → ${l.to} · ${l.miles} mi${done[key]?' · ✓ walked '+done[key]:''}`);
+  line.setTooltipContent(`${l.from} → ${l.to} · ${l.miles} mi${done[key]?' · '+t('walked')+' '+done[key]:''}`);
   renderPanel();updateStats();refreshCoast();
 }
 
@@ -451,17 +522,18 @@ function renderPanel(){
     const wrap=document.createElement('div');wrap.className='sec'+(isOpen?' open':'');
     wrap.innerHTML=`<div class="sec-head">
         <span class="sec-dot" style="background:${sec.color}"></span>
-        <div class="sec-info"><div class="sec-name">${sec.name}</div>
-          <div class="sec-prog">${dl.length}/${sl.length} legs · ${dm}/${sm} mi</div>
+        <div class="sec-info"><div class="sec-name">${secName(sec)}</div>
+          <div class="sec-prog">${dl.length}/${sl.length} ${t('legs')} · ${dm}/${sm} mi</div>
           <div class="sec-bar"><span style="width:${secPct}%;background:${sec.color}"></span></div></div>
         <span class="sec-pct">${secPct.toFixed(1)}%</span>
         <span class="chev">▶</span></div><div class="legs"></div>`;
     const box=wrap.querySelector('.legs');
     sl.forEach(l=>{
       const d=!!done[l.key];const row=document.createElement('div');row.className='leg'+(d?' done':'');
+      if(d && typeof done[l.key]==='string') row.title='Walked '+done[l.key];
       row.innerHTML=`<span class="leg-check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></span>
         <span class="leg-txt">${l.from} → ${l.to}</span>
-        <button class="note-btn${notes[l.key]?' has-note':''}" type="button" title="${notes[l.key]?'Edit note':'Add a note'}">📝</button>
+        <button class="note-btn${notes[l.key]?' has-note':''}" type="button" title="${notes[l.key]?t('editNote'):t('addNote')}">📝</button>
         <button class="elev-btn" type="button" title="Elevation profile">⛰</button>
         <span class="leg-m">${l.miles} mi</span>`;
       row.addEventListener('click',e=>{e.stopPropagation();toggleLeg(l.key);
@@ -472,17 +544,17 @@ function renderPanel(){
         e.stopPropagation();
         const open=elevPanel.classList.toggle('open');
         if(open && !elevPanel.dataset.loaded){
-          elevPanel.innerHTML='<span class="elev-loading">Loading elevation…</span>';
+          elevPanel.innerHTML='<span class="elev-loading">'+t('elevLoading')+'</span>';
           try{
             const prof=await getElevationProfile(l);
             const diffClass='diff-'+prof.difficulty.toLowerCase();
             elevPanel.innerHTML=renderElevSVG(prof)+
-              `<div class="elev-meta"><span class="${diffClass}">${prof.difficulty}</span>`+
+              `<div class="elev-meta"><span class="${diffClass}">${t(prof.difficulty.toLowerCase())}</span>`+
               `<span class="elev-sub">↑${prof.ascent}m ↓${prof.descent}m over ${l.miles} mi</span></div>`;
             elevBtn.classList.add('has-data'); elevBtn.title='Elevation: '+prof.difficulty;
             elevPanel.dataset.loaded='1';
           }catch(err){
-            elevPanel.innerHTML='<span class="elev-loading">Elevation data unavailable (offline?)</span>';
+            elevPanel.innerHTML='<span class="elev-loading">'+t('elevFail')+'</span>';
           }
         }
       });
@@ -490,7 +562,7 @@ function renderPanel(){
       noteBtn.addEventListener('click',e=>{
         e.stopPropagation();
         const cur=notes[l.key]||'';
-        const txt=prompt(`Note for ${l.from} → ${l.to}:`,cur);
+        const txt=prompt(`${t('notePrompt')} ${l.from} → ${l.to}:`,cur);
         if(txt===null) return;              // cancelled
         if(txt.trim()===''){ delete notes[l.key]; }
         else notes[l.key]=txt.trim().slice(0,500);
@@ -517,17 +589,17 @@ function updateStats(){
   document.getElementById('hbarFill').style.width=p+'%';
 }
 document.getElementById('resetBtn').addEventListener('click',()=>{
-  if(!confirm('Clear all walked legs?')) return;
+  if(!confirm(t('confirmReset'))) return;
   const snapshot={...done};
   done={};save();redrawAllLegs();
-  showActionNote(`Progress cleared (${Object.keys(snapshot).length} legs).`,'Undo',()=>{
+  showActionNote(`${t('cleared')} (${Object.keys(snapshot).length} ${t('legs')}).`,t('undo'),()=>{
     done=snapshot;save();redrawAllLegs();
   });
 });
 document.getElementById('expandBtn').addEventListener('click',e=>{
   const anyClosed=ROUTE.some(s=>!openState[s.id]);
   ROUTE.forEach(s=>openState[s.id]=anyClosed);
-  e.target.textContent=anyClosed?'Collapse all':'Expand all';renderPanel();
+  e.target.textContent=anyClosed?t('collapseAll'):t('expandAll');renderPanel();
 });
 
 // ---- GPX export (usable in OS Maps, Garmin, Komoot, Strava etc.) ----
@@ -557,7 +629,122 @@ document.getElementById('gpxBtn').addEventListener('click',()=>{
   a.href=url; a.download='wales-coast-path.gpx';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
-  showNote('GPX downloaded — import it into OS Maps, Garmin Connect, Komoot or similar to navigate any leg.','ok');
+  showNote(t('gpxDone'),'ok');
+});
+
+
+// ---- Share progress image (canvas render of the route + stats) ----
+document.getElementById('shareImgBtn').addEventListener('click',async()=>{
+  const W=1080,H=1350;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+  // background
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#1f5f72'); grad.addColorStop(1,'#143f4d');
+  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
+  // projection over all leg geometry
+  let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+  legs.forEach(l=>legPath(l).forEach(p=>{
+    if(p[0]<minLat)minLat=p[0]; if(p[0]>maxLat)maxLat=p[0];
+    if(p[1]<minLon)minLon=p[1]; if(p[1]>maxLon)maxLon=p[1];
+  }));
+  const midlat=(minLat+maxLat)/2*Math.PI/180;
+  const sx=Math.cos(midlat);
+  const spanX=(maxLon-minLon)*sx, spanY=maxLat-minLat;
+  const pad=90, top=250, availW=W-2*pad, availH=H-top-200;
+  const scale=Math.min(availW/spanX, availH/spanY);
+  const offX=(W-spanX*scale)/2, offY=top+(availH-spanY*scale)/2;
+  const X=lon=>offX+((lon-minLon)*sx)*scale;
+  const Y=lat=>offY+(maxLat-lat)*scale;
+  // draw unwalked then walked (red on top)
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  const draw=(l,color,width)=>{
+    const g=legPath(l);
+    ctx.strokeStyle=color; ctx.lineWidth=width;
+    ctx.beginPath();
+    g.forEach((p,i)=>{ const x=X(p[1]),y=Y(p[0]); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+    ctx.stroke();
+  };
+  legs.filter(l=>!done[l.key]).forEach(l=>draw(l,'rgba(255,255,255,0.35)',5));
+  legs.filter(l=>done[l.key]).forEach(l=>draw(l,'#ff4136',7));
+  // text
+  const w=legs.filter(l=>done[l.key]).reduce((s,l)=>s+l.miles,0);
+  const pct=(w/TOTAL*100).toFixed(1);
+  ctx.fillStyle='#f6c049'; ctx.font='600 34px system-ui,sans-serif';
+  ctx.fillText('LLWYBR ARFORDIR CYMRU',pad,110);
+  ctx.fillStyle='#fbf8f1'; ctx.font='700 64px Georgia,serif';
+  ctx.fillText('Wales Coast Path',pad,180);
+  ctx.font='600 46px system-ui,sans-serif';
+  ctx.fillStyle='#ff4136';
+  ctx.fillText(`${w} of ${TOTAL} miles — ${pct}%`,pad,H-110);
+  ctx.fillStyle='rgba(251,248,241,0.75)'; ctx.font='400 30px system-ui,sans-serif';
+  ctx.fillText(todayStr(),pad,H-60);
+  // export: native share if possible, else download
+  cv.toBlob(async blob=>{
+    if(!blob){ showNote(t('shareFail'),'err'); return; }
+    const file=new File([blob],'wales-coast-path-progress.png',{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],title:'Wales Coast Path'}); return; }catch(e){/* user cancelled — fall through to download */}
+    }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='wales-coast-path-progress.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    showNote(t('shareSaved'),'ok');
+  },'image/png');
+});
+
+
+// ---- Install as app ----
+let deferredInstall=null;
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredInstall=e; });
+function isStandalone(){
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      || (typeof navigator!=='undefined' && navigator.standalone===true);
+}
+function isIOS(){
+  return typeof navigator!=='undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent||'');
+}
+const installOverlay=document.getElementById('installOverlay');
+const installBody=document.getElementById('installBody');
+document.getElementById('installClose').addEventListener('click',()=>installOverlay.classList.remove('open'));
+installOverlay.addEventListener('click',e=>{ if(e.target===installOverlay) installOverlay.classList.remove('open'); });
+function stepsHTML(titleKey,stepsKey){
+  const steps=t(stepsKey);
+  if(!Array.isArray(steps)) return '';
+  return `<h3>${t(titleKey)}</h3><ol>${steps.map(s=>`<li>${s}</li>`).join('')}</ol>`;
+}
+document.getElementById('installBtn').addEventListener('click',async()=>{
+  // Chrome/Android with a captured prompt: offer one-tap install first
+  if(deferredInstall){
+    try{
+      deferredInstall.prompt();
+      const choice=await deferredInstall.userChoice;
+      if(choice && choice.outcome==='accepted'){ deferredInstall=null; return; }
+    }catch(e){}
+  }
+  // Otherwise: platform-aware instructions
+  let html='';
+  if(isStandalone()){
+    html+=`<p class="install-steps"><b>${t('installedNote')}</b></p>`;
+  }
+  html+=`<div class="install-steps"><p>${t('installIntro')}</p>`;
+  if(deferredInstall){
+    html+=`<button class="install-now" id="installNowBtn">${t('installNow')}</button>`;
+  }
+  const blocks = isIOS()
+    ? [['iosH','iosSteps'],['androidH','androidSteps'],['desktopH','desktopSteps']]
+    : [['androidH','androidSteps'],['iosH','iosSteps'],['desktopH','desktopSteps']];
+  blocks.forEach(([a,b])=>{ html+=stepsHTML(a,b); });
+  html+='</div>';
+  installBody.innerHTML=html;
+  const nowBtn=document.getElementById('installNowBtn');
+  if(nowBtn) nowBtn.addEventListener('click',async()=>{
+    if(!deferredInstall) return;
+    deferredInstall.prompt();
+    try{ const c=await deferredInstall.userChoice; if(c&&c.outcome==='accepted'){deferredInstall=null; installOverlay.classList.remove('open');} }catch(e){}
+  });
+  installOverlay.classList.add('open');
 });
 
 // ---- Stats summary ----
@@ -566,6 +753,7 @@ const statsBody=document.getElementById('statsBody');
 function closeStats(){ statsOverlay.classList.remove('open'); }
 document.getElementById('statsClose').addEventListener('click',closeStats);
 statsOverlay.addEventListener('click',e=>{ if(e.target===statsOverlay) closeStats(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeStats(); installOverlay.classList.remove('open'); } });
 document.getElementById('statsBtn').addEventListener('click',()=>{
   statsBody.innerHTML=buildStatsHTML();
   statsOverlay.classList.add('open');
@@ -579,19 +767,19 @@ function buildPrintSheet(){
   const walked=legs.filter(l=>done[l.key]);
   const w=walked.reduce((s,l)=>s+l.miles,0);
   const pct=(w/TOTAL*100).toFixed(1);
-  let html=`<h1>Wales Coast Path — Progress Summary</h1>
-    <p class="print-date">Printed ${todayStr()}</p>
+  let html=`<h1>${t('printTitle')}</h1>
+    <p class="print-date">${t('printed')} ${todayStr()}</p>
     <p><b>${w} of ${TOTAL} miles walked (${pct}%)</b> · ${walked.length} of ${legs.length} legs complete</p>`;
   ROUTE.forEach(sec=>{
     const sl=legs.filter(l=>l.secId===sec.id);
     const dl=sl.filter(l=>done[l.key]);
     const sm=sl.reduce((s,l)=>s+l.miles,0), dm=dl.reduce((s,l)=>s+l.miles,0);
-    html+=`<h2>${sec.name} — ${dl.length}/${sl.length} legs, ${dm}/${sm} mi</h2><ul>`;
+    html+=`<h2>${secName(sec)} — ${dl.length}/${sl.length} ${t('legs')}, ${dm}/${sm} mi</h2><ul>`;
     sl.forEach(l=>{
       const d=done[l.key];
       const mark=d? '☑' : '☐';
       const dateStr=typeof d==='string'? ` (${d})` : '';
-      const noteStr=notes[l.key]? `<br><em style="color:#555">— ${notes[l.key]}</em>` : '';
+      const noteStr=notes[l.key]? `<br><em style="color:#555">— ${xmlEsc(notes[l.key])}</em>` : '';
       html+=`<li>${mark} ${l.from} → ${l.to} — ${l.miles} mi${dateStr}${noteStr}</li>`;
     });
     html+='</ul>';
@@ -644,28 +832,28 @@ function buildStatsHTML(){
     const dl=sl.filter(l=>done[l.key]);
     const sm=sl.reduce((s,l)=>s+l.miles,0); const dm=dl.reduce((s,l)=>s+l.miles,0);
     const p=sm? dm/sm*100 : 0;
-    if(p<99.9 && p>closestPct){ closestPct=p; closest=sec.name; }
+    if(p<99.9 && p>closestPct){ closestPct=p; closest=secName(sec); }
   });
   const row=(k,v)=>`<div class="stat-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
   let html='';
-  html+=row('Miles walked', `${w} / ${TOTAL} mi`);
-  html+=row('Overall progress', pct+'%');
-  html+=row('Legs completed', `${walked.length} / ${legs.length}`);
-  html+='<div class="stat-section-title">Walking days</div>';
-  html+=row('Days walked', walkingDays || '–');
-  html+=row('Avg miles / walking day', avgPerDay);
-  html+=row('Longest single day', longestDay? `${longestMiles} mi (${longestDay})` : '–');
-  html+=row('Most recent walk', lastDate || '–');
-  html+='<div class="stat-section-title">What\'s next</div>';
-  html+=row('Closest to finishing', closest? `${closest} (${closestPct.toFixed(0)}%)` : 'All sections complete 🎉');
+  html+=row(t('milesWalked'), `${w} / ${TOTAL} mi`);
+  html+=row(t('overall'), pct+'%');
+  html+=row(t('legsCompleted'), `${walked.length} / ${legs.length}`);
+  html+='<div class="stat-section-title">'+t('walkingDays')+'</div>';
+  html+=row(t('daysWalked'), walkingDays || '–');
+  html+=row(t('avgPerDay'), avgPerDay);
+  html+=row(t('longestDay'), longestDay? `${longestMiles} mi (${longestDay})` : '–');
+  html+=row(t('recentWalk'), lastDate || '–');
+  html+='<div class="stat-section-title">'+t('whatsNext')+'</div>';
+  html+=row(t('closest'), closest? `${closest} (${closestPct.toFixed(0)}%)` : t('allDone'));
   const chart=renderProgressChart(byDate);
-  if(chart){ html+='<div class="stat-section-title">Progress over time</div>'+chart; }
+  if(chart){ html+='<div class="stat-section-title">'+t('overTime')+'</div>'+chart; }
   return html;
 }
 
 function redrawAllLegs(){
   legs.forEach(l=>{const ln=legLines[l.id];ln.setStyle(styleFor(l));
-    ln.setTooltipContent(`${l.from} → ${l.to} · ${l.miles} mi${done[l.key]?' · ✓ walked'+(typeof done[l.key]==='string'?' '+done[l.key]:''):''}`);
+    ln.setTooltipContent(`${l.from} → ${l.to} · ${l.miles} mi${done[l.key]?' · '+t('walked')+(typeof done[l.key]==='string'?' '+done[l.key]:''):''}`);
     if(done[l.key]) ln.bringToFront();});
   renderPanel();updateStats();refreshCoast();
 }
@@ -700,7 +888,7 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  const stamp=new Date().toISOString().slice(0,10);
+  const stamp=todayStr();
   const safe=name?name.replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase():'progress';
   a.href=url; a.download=`wales-coast-path-${safe}-${stamp}.json`;
   document.body.appendChild(a); a.click(); a.remove();
@@ -755,6 +943,173 @@ importFile.addEventListener('change',e=>{
   reader.readAsText(file);
 });
 
+
+
+// ---- Bilingual UI (English / Cymraeg) ----
+const I18N={
+ en:{
+  hideList:'Hide list',showList:'Show list',
+  searchPh:'Find a place… e.g. Llangrannog',
+  hintHTML:'<b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Faint dashed lines are the official alternative routes. Saves automatically.',
+  sections:'Sections & day legs', ofMi:'of', mi:'mi', doneLbl:'done', legs:'legs',
+  expandAll:'Expand all',collapseAll:'Collapse all',resetAll:'Reset all',
+  exportBtn:'⬇ Export progress',importBtn:'⬆ Import progress',
+  statsBtn:'📊 Stats',printBtn:'🖨 Print summary',
+  gpxBtn:'🥾 GPX route (for OS Maps / Garmin)',shareBtn:'📸 Share progress image',
+  yourProgress:'Your progress',milesWalked:'Miles walked',overall:'Overall progress',
+  legsCompleted:'Legs completed',walkingDays:'Walking days',daysWalked:'Days walked',
+  avgPerDay:'Avg miles / walking day',longestDay:'Longest single day',recentWalk:'Most recent walk',
+  whatsNext:"What's next",closest:'Closest to finishing',allDone:'All sections complete 🎉',
+  overTime:'Progress over time',
+  walked:'✓ walked',tapHint:'Now tap the next place along the coast to mark that stretch walked',
+  confirmReset:'Clear all walked legs?',cleared:'Progress cleared',undo:'Undo',
+  addNote:'Add a note',editNote:'Edit note',notePrompt:'Note for',
+  easy:'Easy',moderate:'Moderate',strenuous:'Strenuous',
+  elevLoading:'Loading elevation…',elevFail:'Elevation data unavailable (offline?)',
+  gpxDone:'GPX downloaded — import it into OS Maps, Garmin Connect, Komoot or similar to navigate any leg.',
+  shareSaved:'Progress image saved.',shareFail:'Could not create the image.',
+  locFail:'Could not get your location — check location permissions for your browser.',
+  printTitle:'Wales Coast Path — Progress Summary',printed:'Printed',
+  installBtn:'📲 Install as app',installTitle:'Install as an app',
+  installNow:'Install now',installedNote:'✓ Already installed — you\'re using the app right now.',
+  installIntro:'This site is a full app: once installed it gets its own icon, opens full-screen, and works offline.',
+  iosH:'iPhone / iPad (Safari)',
+  iosSteps:['Open this site in <b>Safari</b> (installing doesn\'t work from other iPhone browsers).','Tap the <b>Share</b> button — the square with an arrow, at the bottom of the screen.','Scroll down and tap <b>“Add to Home Screen”</b>.','Tap <b>Add</b>. The app appears on your home screen.'],
+  androidH:'Android (Chrome)',
+  androidSteps:['Tap the <b>⋮ menu</b> in the top-right corner of Chrome.','Tap <b>“Add to Home screen”</b> or <b>“Install app”</b>.','Confirm — the app appears on your home screen and in the app drawer.'],
+  desktopH:'Computer (Chrome / Edge)',
+  desktopSteps:['Look for the <b>install icon</b> at the right-hand end of the address bar (a screen with a down arrow).','Click it and choose <b>Install</b>.']
+ },
+ cy:{
+  hideList:'Cuddio\'r rhestr',showList:'Dangos y rhestr',
+  searchPh:'Chwilio am le… e.e. Llangrannog',
+  hintHTML:'<b>Mae pob darn yn dilyn Llwybr Arfordir Cymru go iawn</b> (data llwybr yr Arolwg Ordnans). Cliciwch un dref ac yna\'r nesaf ar hyd yr arfordir — bydd y darn rhyngddynt yn troi\'n <b style="color:#d62828">goch</b> i nodi ei fod wedi\'i gerdded. Llinellau toredig gwan yw\'r llwybrau amgen swyddogol. Yn cadw\'n awtomatig.',
+  sections:'Adrannau a chamau dydd', ofMi:'o', mi:'mi', doneLbl:'wedi\'i wneud', legs:'cam',
+  expandAll:'Ehangu popeth',collapseAll:'Cau popeth',resetAll:'Ailosod popeth',
+  exportBtn:'⬇ Allforio cynnydd',importBtn:'⬆ Mewnforio cynnydd',
+  statsBtn:'📊 Ystadegau',printBtn:'🖨 Argraffu crynodeb',
+  gpxBtn:'🥾 Llwybr GPX (OS Maps / Garmin)',shareBtn:'📸 Rhannu llun cynnydd',
+  yourProgress:'Eich cynnydd',milesWalked:'Milltiroedd a gerddwyd',overall:'Cynnydd cyffredinol',
+  legsCompleted:'Camau wedi\'u cwblhau',walkingDays:'Diwrnodau cerdded',daysWalked:'Diwrnodau cerdded',
+  avgPerDay:'Milltiroedd cyfartalog / diwrnod',longestDay:'Diwrnod hiraf',recentWalk:'Taith ddiweddaraf',
+  whatsNext:'Beth nesaf',closest:'Agosaf at orffen',allDone:'Pob adran wedi\'i chwblhau 🎉',
+  overTime:'Cynnydd dros amser',
+  walked:'✓ cerddwyd',tapHint:'Nawr tapiwch y lle nesaf ar hyd yr arfordir i nodi\'r darn fel un a gerddwyd',
+  confirmReset:'Clirio pob cam a gerddwyd?',cleared:'Cynnydd wedi\'i glirio',undo:'Dadwneud',
+  addNote:'Ychwanegu nodyn',editNote:'Golygu nodyn',notePrompt:'Nodyn ar gyfer',
+  easy:'Hawdd',moderate:'Cymedrol',strenuous:'Llafurus',
+  elevLoading:'Wrthi\'n llwytho uchder…',elevFail:'Data uchder ddim ar gael (all-lein?)',
+  gpxDone:'GPX wedi\'i lawrlwytho — mewnforiwch i OS Maps, Garmin Connect, Komoot neu debyg.',
+  shareSaved:'Llun cynnydd wedi\'i gadw.',shareFail:'Methu creu\'r llun.',
+  locFail:'Methu cael eich lleoliad — gwiriwch ganiatâd lleoliad eich porwr.',
+  printTitle:'Llwybr Arfordir Cymru — Crynodeb Cynnydd',printed:'Argraffwyd',
+  installBtn:'📲 Gosod fel ap',installTitle:'Gosod fel ap',
+  installNow:'Gosod nawr',installedNote:'✓ Eisoes wedi\'i osod — rydych yn defnyddio\'r ap nawr.',
+  installIntro:'Mae\'r wefan hon yn ap llawn: ar ôl ei gosod caiff ei heicon ei hun, mae\'n agor sgrin lawn, ac mae\'n gweithio all-lein.',
+  iosH:'iPhone / iPad (Safari)',
+  iosSteps:['Agorwch y wefan hon yn <b>Safari</b> (nid yw gosod yn gweithio o borwyr eraill ar iPhone).','Tapiwch y botwm <b>Rhannu</b> — y sgwâr gyda saeth, ar waelod y sgrin.','Sgroliwch i lawr a thapiwch <b>“Add to Home Screen”</b>.','Tapiwch <b>Add</b>. Bydd yr ap yn ymddangos ar eich sgrin gartref.'],
+  androidH:'Android (Chrome)',
+  androidSteps:['Tapiwch y ddewislen <b>⋮</b> yng nghornel dde uchaf Chrome.','Tapiwch <b>“Add to Home screen”</b> neu <b>“Install app”</b>.','Cadarnhewch — bydd yr ap yn ymddangos ar eich sgrin gartref.'],
+  desktopH:'Cyfrifiadur (Chrome / Edge)',
+  desktopSteps:['Chwiliwch am yr <b>eicon gosod</b> ar ochr dde\'r bar cyfeiriad.','Cliciwch arno a dewiswch <b>Install</b>.']
+ }
+};
+const SEC_NAME_CY={north:'Arfordir Gogledd Cymru',anglesey:'Ynys Môn',llyn:'Arfordir Llŷn ac Eryri',
+ cered:'Ceredigion',pembs:'Sir Benfro',carm:'Sir Gaerfyrddin',gower:'Gŵyr a Bae Abertawe',south:'De Cymru a Hafren'};
+let LANG='en';
+function t(k){ return (I18N[LANG]&&I18N[LANG][k])||I18N.en[k]||k; }
+function secName(sec){ return LANG==='cy'? (SEC_NAME_CY[sec.id]||sec.name) : sec.name; }
+const LANG_KEY='wcp_lang';
+function applyLang(){
+  document.getElementById('langBtn').textContent=LANG==='cy'?'Eng':'Cym';
+  document.getElementById('townSearch').placeholder=t('searchPh');
+  document.querySelector('.hint').innerHTML=t('hintHTML');
+  document.querySelector('.panel h2').textContent=t('sections');
+  document.getElementById('lblOf').innerHTML=t('ofMi')+' <span id="hTotal">'+TOTAL+'</span> '+t('mi');
+  document.getElementById('lblDone').textContent=t('doneLbl');
+  const eb=document.getElementById('expandBtn');
+  eb.textContent=ROUTE.some(s=>!openState[s.id])? t('expandAll'):t('collapseAll');
+  document.getElementById('resetBtn').textContent=t('resetAll');
+  document.getElementById('exportBtn').textContent=t('exportBtn');
+  document.getElementById('importBtn').textContent=t('importBtn');
+  document.getElementById('statsBtn').textContent=t('statsBtn');
+  document.getElementById('printBtn').textContent=t('printBtn');
+  document.getElementById('gpxBtn').textContent=t('gpxBtn');
+  document.getElementById('shareImgBtn').textContent=t('shareBtn');
+  panelToggleTxt.textContent=document.body.classList.contains('panel-min')? t('showList'):t('hideList');
+  document.getElementById('statsTitle').textContent=t('yourProgress');
+  document.getElementById('installBtn').textContent=t('installBtn');
+  document.getElementById('installTitle').textContent=t('installTitle');
+  renderPanel(); updateStats(); redrawAllLegs();
+}
+document.getElementById('langBtn').addEventListener('click',async()=>{
+  LANG=(LANG==='cy')?'en':'cy';
+  try{ await appStore.set(LANG_KEY,LANG); }catch(e){}
+  applyLang();
+});
+
+// ---- Town search ----
+const searchInput=document.getElementById('townSearch');
+const searchResults=document.getElementById('searchResults');
+function townSection(name){
+  const l=legs.find(x=>x.from===name||x.to===name);
+  return l? ROUTE.find(s=>s.id===l.secId) : null;
+}
+function normTxt(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function doSearch(q){
+  searchResults.innerHTML='';
+  q=normTxt(q.trim());
+  if(q.length<2){ searchResults.classList.remove('open'); return; }
+  const names=Object.keys(townByName).filter(n=>normTxt(n).includes(q)).slice(0,8);
+  if(!names.length){ searchResults.classList.remove('open'); return; }
+  names.forEach(n=>{
+    const sec=townSection(n);
+    const div=document.createElement('div'); div.className='search-hit';
+    div.innerHTML=`<span>${n}</span><span class="sec-tag">${sec?sec.name:''}</span>`;
+    div.addEventListener('click',()=>{
+      searchResults.classList.remove('open'); searchInput.value=n;
+      const tm=townByName[n];
+      const l=legs.find(x=>x.from===n||x.to===n);
+      const coord=l? (l.from===n? legPath(l)[0] : legPath(l)[legPath(l).length-1]) : null;
+      if(coord){ map.setView(coord,12); }
+      if(tm&&tm.marker&&tm.marker.openTooltip) tm.marker.openTooltip();
+      if(l){ openState[l.secId]=true; renderPanel(); }
+    });
+    searchResults.appendChild(div);
+  });
+  searchResults.classList.add('open');
+}
+searchInput.addEventListener('input',e=>doSearch(e.target.value));
+searchInput.addEventListener('blur',()=>setTimeout(()=>searchResults.classList.remove('open'),200));
+
+// ---- Mobile panel collapse ----
+const panelToggle=document.getElementById('panelToggle');
+const panelToggleTxt=document.getElementById('panelToggleTxt');
+panelToggle.addEventListener('click',()=>{
+  const min=document.body.classList.toggle('panel-min');
+  panelToggleTxt.textContent=min? t('showList') : t('hideList');
+  panelToggle.firstChild.textContent=min?'▴ ':'▾ ';
+  setTimeout(()=>map.invalidateSize(),250);
+});
+
+// ---- Dark mode ----
+const THEME_KEY='wcp_theme';
+function applyTheme(mode){
+  if(mode==='dark') document.documentElement.setAttribute('data-theme','dark');
+  else document.documentElement.removeAttribute('data-theme');
+}
+let theme=null;
+(async()=>{
+  try{ const r=await appStore.get(THEME_KEY); if(r&&r.value) theme=r.value; }catch(e){}
+  if(!theme) theme=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  applyTheme(theme);
+})();
+document.getElementById('themeBtn').addEventListener('click',async()=>{
+  theme=(theme==='dark')?'light':'dark';
+  applyTheme(theme);
+  try{ await appStore.set(THEME_KEY,theme); }catch(e){}
+});
+
 // --- Locate me (handy when walking the path) ---
 let locMarker=null, locCircle=null, locOn=false;
 const locateBtn=document.getElementById('locateBtn');
@@ -777,7 +1132,7 @@ map.on('locationfound',e=>{
 });
 map.on('locationerror',()=>{
   locateBtn.textContent='◎';
-  showNote('Could not get your location — check location permissions for your browser.','err');
+  showNote(t('locFail'),'err');
 });
 
 // --- Elevation profile per leg (on demand, free no-key API: open-meteo.com) ---
@@ -867,7 +1222,11 @@ function showTapHint(msg){
 }
 
 (async()=>{
-  await load();await loadNotes();drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
+  await load();await loadNotes();
+  try{ const r=await appStore.get(LANG_KEY); if(r&&r.value&&I18N[r.value]) LANG=r.value; }catch(e){}
+  drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
+  if(LANG!=='en') applyLang();
+  else document.getElementById('langBtn').textContent='Cym';
   map.fitBounds(WALES_BOUNDS);
   // Offline support: register the service worker (real web hosts only — needs http/https and the sw.js file alongside this page)
   if('serviceWorker' in navigator && location.protocol.indexOf('http')===0){
