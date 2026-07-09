@@ -266,6 +266,7 @@
       <button class="poi-chip" data-poi="parking" title="Car parks">🅿️</button>
       <button class="poi-chip" data-poi="toilet" title="Public toilets">🚻</button>
       <button class="poi-chip" data-poi="bus" title="Bus stops">🚌</button>
+      <button class="poi-chip" data-poi="station" title="Train stations">🚉</button>
     </div>
     <div id="tapHint"></div>
   </div>
@@ -275,7 +276,7 @@
       <input id="townSearch" type="search" placeholder="Find a place… e.g. Llangrannog" autocomplete="off">
       <div id="searchResults" class="search-results"></div>
     </div>
-    <div class="hint"><b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Use the 🅿️ 🚻 🚌 buttons to show car parks, toilets and bus stops (zoom in to see them; community data, so check before relying on it). Saves automatically.</div>
+    <div class="hint"><b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Use the 🅿️ 🚻 🚌 🚉 buttons to show car parks, toilets, bus stops and train stations (zoom in to see them; community data, so check before relying on it). Saves automatically.</div>
     <h2>Sections &amp; day legs</h2>
     <div id="secList"></div>
     <div class="panel-actions">
@@ -1104,7 +1105,7 @@ const I18N={
  en:{
   hideList:'Hide list',showList:'Show list',
   searchPh:'Find a place… e.g. Llangrannog',
-  hintHTML:'<b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Use the 🅿️ 🚻 🚌 buttons to show car parks, toilets and bus stops (zoom in to see them; community data, so check before relying on it). Saves automatically.',
+  hintHTML:'<b>Each stretch follows the real Wales Coast Path</b> (Ordnance Survey route data). Click one town then the next along the coast — the stretch between them turns <b style="color:#d62828">red</b> to mark it walked, tracing the actual coastline. Use the 🅿️ 🚻 🚌 🚉 buttons to show car parks, toilets, bus stops and train stations (zoom in to see them; community data, so check before relying on it). Saves automatically.',
   sections:'Sections & day legs', ofMi:'of', mi:'mi', doneLbl:'done', legs:'legs',
   expandAll:'Expand all',collapseAll:'Collapse all',resetAll:'Reset all',
   exportBtn:'⬇ Export progress',importBtn:'⬆ Import progress',
@@ -1125,9 +1126,10 @@ const I18N={
   locFail:'Could not get your location — check location permissions for your browser.',
   printTitle:'Wales Coast Path — Progress Summary',printed:'Printed',
   installBtn:'📲 Install as app',installTitle:'Install as an app',
-  poiParking:'Car park',poiToilet:'Public toilet',poiBus:'Bus stop',
+  poiParking:'Car park',poiToilet:'Public toilet',poiBus:'Bus stop',poiStation:'Train station',
+  poiHeritage:'Heritage / tourist railway',
   poiFree:'Free parking',poiAccessible:'♿ Accessible',poiPaid:'Charge applies',
-  poiZoomHint:'Zoom in to see parking, toilets and bus stops',
+  poiZoomHint:'Zoom in to see parking, toilets, bus stops and train stations',
   poiMissing:'Places data not found — make sure pois.json is uploaded alongside the app.',
   saveNote:'Save',deleteNote:'Delete note',
   markWalked:'Mark walked / not walked',
@@ -1170,9 +1172,10 @@ const I18N={
   locFail:'Methu cael eich lleoliad — gwiriwch ganiatâd lleoliad eich porwr.',
   printTitle:'Llwybr Arfordir Cymru — Crynodeb Cynnydd',printed:'Argraffwyd',
   installBtn:'📲 Gosod fel ap',installTitle:'Gosod fel ap',
-  poiParking:'Maes parcio',poiToilet:'Toiledau cyhoeddus',poiBus:'Safle bws',
+  poiParking:'Maes parcio',poiToilet:'Toiledau cyhoeddus',poiBus:'Safle bws',poiStation:'Gorsaf drên',
+  poiHeritage:'Rheilffordd dreftadaeth / dŵristiaeth',
   poiFree:'Parcio am ddim',poiAccessible:'♿ Hygyrch',poiPaid:'Codir tâl',
-  poiZoomHint:'Chwyddwch i mewn i weld meysydd parcio, toiledau a safleoedd bws',
+  poiZoomHint:'Chwyddwch i mewn i weld meysydd parcio, toiledau, safleoedd bws a gorsafoedd trên',
   poiMissing:'Data lleoedd heb ei ganfod — sicrhewch fod pois.json wedi\'i uwchlwytho.',
   saveNote:'Cadw',deleteNote:'Dileu\'r nodyn',
   markWalked:'Nodi fel wedi\'i gerdded / heb ei gerdded',
@@ -1218,7 +1221,7 @@ function applyLang(){
   document.getElementById('statsTitle').textContent=t('yourProgress');
   document.getElementById('installBtn').textContent=t('installBtn');
   document.getElementById('installTitle').textContent=t('installTitle');
-  const pc={parking:'poiParking',toilet:'poiToilet',bus:'poiBus'};
+  const pc={parking:'poiParking',toilet:'poiToilet',bus:'poiBus',station:'poiStation'};
   document.querySelectorAll('.poi-chip').forEach(b=>{ b.title=t(pc[b.dataset.poi]); });
   renderPanel(); updateStats(); redrawAllLegs();
 }
@@ -1309,10 +1312,10 @@ document.getElementById('themeBtn').addEventListener('click',async()=>{
 
 // ---- Points of interest (parking / toilets / bus stops) ----
 let POI=null;
-const poiState={parking:false,toilet:false,bus:false};
-const poiLayers={parking:[],toilet:[],bus:[]};
+const poiState={parking:false,toilet:false,bus:false,station:false};
+const poiLayers={parking:[],toilet:[],bus:[],station:[]};
 const POI_MIN_ZOOM=13;         // only show markers when zoomed in this far
-const POI_ICON={parking:'🅿️',toilet:'🚻',bus:'🚌'};
+const POI_ICON={parking:'🅿️',toilet:'🚻',bus:'🚌',station:'🚉'};
 const POI_STATE_KEY='wcp_poi_layers';
 async function loadPOI(){
   if(POI) return POI;
@@ -1328,6 +1331,10 @@ function poiMarker(typ,p){
   const m=L.marker([p.lat,p.lon],{icon});
   let txt=`<div class="poi-pop"><b>${p.n?escapeHTML(p.n):poiTypeName(typ)}</b>`;
   if(typ==='parking' && p.free===1) txt+=`<br><span class="poi-flag">${t('poiFree')}</span>`;
+  if(typ==='station'){
+    if(p.crs) txt+=`<br>${escapeHTML(p.crs)}`;
+    if(p.heritage===1) txt+=`<br>${t('poiHeritage')}`;
+  }
   if(typ==='toilet'){
     if(p.acc===1) txt+=`<br><span class="poi-flag">${t('poiAccessible')}</span>`;
     if(p.fee===1) txt+=`<br>${t('poiPaid')}`;
@@ -1337,11 +1344,11 @@ function poiMarker(typ,p){
   return m;
 }
 function escapeHTML(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function poiTypeName(typ){ return typ==='parking'?t('poiParking'):typ==='toilet'?t('poiToilet'):t('poiBus'); }
+function poiTypeName(typ){ return typ==='parking'?t('poiParking'):typ==='toilet'?t('poiToilet'):typ==='station'?t('poiStation'):t('poiBus'); }
 function renderPOI(){
   const z=map.getZoom();
   const bounds=map.getBounds();
-  ['parking','toilet','bus'].forEach(typ=>{
+  ['parking','toilet','bus','station'].forEach(typ=>{
     // clear existing
     poiLayers[typ].forEach(m=>map.removeLayer(m)); poiLayers[typ]=[];
     if(!poiState[typ] || !POI || z<POI_MIN_ZOOM) return;
@@ -1355,7 +1362,7 @@ function renderPOI(){
 }
 function updatePoiHint(){
   // subtle cue when a layer is on but you're zoomed too far out to see them
-  const anyOn=poiState.parking||poiState.toilet||poiState.bus;
+  const anyOn=poiState.parking||poiState.toilet||poiState.bus||poiState.station;
   if(anyOn && map.getZoom()<POI_MIN_ZOOM){ showTapHint(t('poiZoomHint')); }
 }
 async function togglePOI(typ,btn){
@@ -1368,7 +1375,7 @@ async function togglePOI(typ,btn){
 document.querySelectorAll('.poi-chip').forEach(btn=>{
   btn.addEventListener('click',()=>togglePOI(btn.dataset.poi,btn));
 });
-map.on('moveend zoomend',()=>{ if(poiState.parking||poiState.toilet||poiState.bus) renderPOI(); });
+map.on('moveend zoomend',()=>{ if(poiState.parking||poiState.toilet||poiState.bus||poiState.station) renderPOI(); });
 
 // --- Locate me (handy when walking the path) ---
 let locMarker=null, locCircle=null, locOn=false;
@@ -1503,7 +1510,7 @@ function showTapHint(msg){
     const r=await appStore.get(POI_STATE_KEY);
     if(r&&r.value){
       const saved=JSON.parse(r.value); let any=false;
-      ['parking','toilet','bus'].forEach(typ=>{ if(saved[typ]){ poiState[typ]=true; any=true;
+      ['parking','toilet','bus','station'].forEach(typ=>{ if(saved[typ]){ poiState[typ]=true; any=true;
         const b=document.querySelector('.poi-chip[data-poi="'+typ+'"]'); if(b) b.classList.add('on'); } });
       if(any){ await loadPOI(); renderPOI(); }
     }
