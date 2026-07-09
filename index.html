@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Wales Coast Path Map Tracker</title>
 
 <!-- Home-screen app icon & PWA meta -->
@@ -96,13 +96,13 @@
   .prog-svg{width:100%;height:auto;margin-top:4px}
   .stat-section-title{font-size:.75rem;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);
     margin:18px 0 6px}
-  .elev-btn,.note-btn{flex:0 0 auto;background:none;border:1px solid var(--line);border-radius:6px;
+  .elev-btn,.note-btn,.gpx-btn{flex:0 0 auto;background:none;border:1px solid var(--line);border-radius:6px;
     width:26px;height:26px;font-size:.85rem;cursor:pointer;color:var(--ink-soft);line-height:1}
   .note-btn{opacity:.45}
   .note-btn.has-note{opacity:1;border-color:var(--shell,#c9a227);background:#fdf6e3}
   .leg-note{padding:2px 12px 6px 41px;font-size:.72rem;font-style:italic;color:var(--ink-soft);
     white-space:pre-wrap;word-break:break-word}
-  .elev-btn:hover{background:var(--sand)}
+  .elev-btn:hover,.gpx-btn:hover{background:var(--sand)}
   .elev-btn.has-data{border-color:var(--sea);color:var(--sea)}
   .elev-panel{display:none;padding:8px 10px 10px 40px;font-size:.72rem;color:var(--ink-soft)}
   .elev-panel.open{display:block}
@@ -226,6 +226,11 @@
   .install-steps .muted{color:var(--ink-soft);font-size:.78rem}
   .install-now{display:inline-block;margin:6px 0 12px;padding:10px 16px;background:var(--sea);color:#fff;
     border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer}
+  #noteText{width:100%;min-height:110px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+    font-size:.9rem;font-family:inherit;background:#fff;color:var(--ink);resize:vertical;margin-bottom:12px}
+  #noteText:focus{outline:2px solid var(--sea);outline-offset:-1px}
+  [data-theme="dark"] #noteText{background:#1b2627;color:var(--ink)}
+  .overlay-msg{font-size:.9rem;line-height:1.5;color:var(--ink);margin-bottom:14px}
   .print-only{display:none}
   @media print{
     body>*:not(#printSheet){display:none !important}
@@ -308,6 +313,29 @@
     <button id="installClose" class="overlay-close" aria-label="Close">✕</button>
     <h2 id="installTitle">Install as an app</h2>
     <div id="installBody"></div>
+  </div>
+</div>
+<div id="noteOverlay" class="overlay">
+  <div class="overlay-card">
+    <button id="noteClose" class="overlay-close" aria-label="Close">✕</button>
+    <h2 id="noteTitle">Note</h2>
+    <textarea id="noteText" maxlength="500"></textarea>
+    <div class="panel-actions">
+      <button class="btn" id="noteSaveBtn">Save</button>
+      <button class="btn" id="noteDeleteBtn">Delete note</button>
+    </div>
+  </div>
+</div>
+<div id="importOverlay" class="overlay">
+  <div class="overlay-card">
+    <button id="importCloseX" class="overlay-close" aria-label="Close">✕</button>
+    <h2 id="importChoiceTitle">Import progress</h2>
+    <p class="overlay-msg" id="importChoiceMsg"></p>
+    <div class="panel-actions">
+      <button class="btn" id="impReplaceBtn">Replace</button>
+      <button class="btn" id="impMergeBtn">Merge</button>
+      <button class="btn" id="impCancelBtn">Cancel</button>
+    </div>
   </div>
 </div>
 <div id="printSheet" class="print-only"></div>
@@ -522,38 +550,78 @@ function toggleLeg(key){
   line.setStyle(styleFor(l));
   if(done[key]) line.bringToFront();
   line.setTooltipContent(`${l.from} → ${l.to} · ${l.miles} mi${done[key]?' · '+t('walked')+' '+done[key]:''}`);
-  renderPanel();updateStats();refreshCoast();
+  updateLegRow(key);updateStats();refreshCoast();
 }
 
 const secEl=document.getElementById('secList');
 let openState={};
+function secStats(secId){
+  const sl=legs.filter(l=>l.secId===secId);
+  const dl=sl.filter(l=>done[l.key]);
+  const sm=sl.reduce((s,l)=>s+l.miles,0), dm=dl.reduce((s,l)=>s+l.miles,0);
+  return {sl,dl,sm,dm,pct:sm? dm/sm*100 : 0};
+}
+function updateSecHead(secId){
+  const wrap=secEl.querySelector('.sec[data-sec="'+secId+'"]'); if(!wrap) return;
+  const st=secStats(secId);
+  wrap.querySelector('.sec-prog').textContent=`${st.dl.length}/${st.sl.length} ${t('legs')} · ${st.dm}/${st.sm} mi`;
+  wrap.querySelector('.sec-bar span').style.width=st.pct+'%';
+  wrap.querySelector('.sec-pct').textContent=st.pct.toFixed(1)+'%';
+}
+function legRowEl(key){
+  for(const r of secEl.querySelectorAll('.leg')){ if(r.dataset.key===key) return r; }
+  return null;
+}
+function updateLegRow(key){
+  const l=legs.find(x=>x.key===key); if(!l) return;
+  const row=legRowEl(key); if(!row) return;
+  const d=!!done[key];
+  row.classList.toggle('done',d);
+  row.title=(d&&typeof done[key]==='string')? 'Walked '+done[key] : '';
+  updateSecHead(l.secId);
+}
+function updateNoteLine(key){
+  const row=legRowEl(key); if(!row) return;
+  const btn=row.querySelector('.note-btn');
+  btn.classList.toggle('has-note',!!notes[key]);
+  btn.title=notes[key]? t('editNote') : t('addNote');
+  let line=row.nextElementSibling;
+  const hasLine=line && line.classList && line.classList.contains('leg-note');
+  if(notes[key]){
+    if(!hasLine){ line=document.createElement('div'); line.className='leg-note'; row.after(line); }
+    line.textContent='📝 '+notes[key];
+  } else if(hasLine){ line.remove(); }
+}
 function renderPanel(){
   secEl.innerHTML='';
   ROUTE.forEach(sec=>{
-    const sl=legs.filter(l=>l.secId===sec.id);
-    const dl=sl.filter(l=>done[l.key]);
-    const sm=sl.reduce((s,l)=>s+l.miles,0);const dm=dl.reduce((s,l)=>s+l.miles,0);
-    const secPct=sm? (dm/sm*100) : 0;
+    const st=secStats(sec.id);
     const isOpen=!!openState[sec.id];
     const wrap=document.createElement('div');wrap.className='sec'+(isOpen?' open':'');
+    wrap.dataset.sec=sec.id;
     wrap.innerHTML=`<div class="sec-head">
         <span class="sec-dot" style="background:${sec.color}"></span>
         <div class="sec-info"><div class="sec-name">${secName(sec)}</div>
-          <div class="sec-prog">${dl.length}/${sl.length} ${t('legs')} · ${dm}/${sm} mi</div>
-          <div class="sec-bar"><span style="width:${secPct}%;background:${sec.color}"></span></div></div>
-        <span class="sec-pct">${secPct.toFixed(1)}%</span>
+          <div class="sec-prog">${st.dl.length}/${st.sl.length} ${t('legs')} · ${st.dm}/${st.sm} mi</div>
+          <div class="sec-bar"><span style="width:${st.pct}%;background:${sec.color}"></span></div></div>
+        <span class="sec-pct">${st.pct.toFixed(1)}%</span>
         <span class="chev">▶</span></div><div class="legs"></div>`;
     const box=wrap.querySelector('.legs');
-    sl.forEach(l=>{
+    st.sl.forEach(l=>{
       const d=!!done[l.key];const row=document.createElement('div');row.className='leg'+(d?' done':'');
+      row.dataset.key=l.key;
       if(d && typeof done[l.key]==='string') row.title='Walked '+done[l.key];
-      row.innerHTML=`<span class="leg-check"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></span>
+      row.innerHTML=`<span class="leg-check" title="${t('markWalked')}"><svg viewBox="0 0 24 24"><polyline points="4 12 10 18 20 6"/></svg></span>
         <span class="leg-txt">${l.from} → ${l.to}</span>
         <button class="note-btn${notes[l.key]?' has-note':''}" type="button" title="${notes[l.key]?t('editNote'):t('addNote')}">📝</button>
+        <button class="gpx-btn" type="button" title="${t('legGpx')}">⤓</button>
         <button class="elev-btn" type="button" title="Elevation profile">⛰</button>
         <span class="leg-m">${l.miles} mi</span>`;
-      row.addEventListener('click',e=>{e.stopPropagation();toggleLeg(l.key);
+      // Tapping the row zooms to the leg on the map; only the checkbox toggles walked state.
+      row.addEventListener('click',e=>{e.stopPropagation();
         map.fitBounds(L.latLngBounds(legPath(l)).pad(0.5));});
+      row.querySelector('.leg-check').addEventListener('click',e=>{
+        e.stopPropagation(); toggleLeg(l.key);});
       const elevPanel=document.createElement('div'); elevPanel.className='elev-panel';
       const elevBtn=row.querySelector('.elev-btn');
       elevBtn.addEventListener('click',async e=>{
@@ -574,16 +642,11 @@ function renderPanel(){
           }
         }
       });
+      row.querySelector('.gpx-btn').addEventListener('click',e=>{
+        e.stopPropagation(); downloadLegGPX(l);});
       const noteBtn=row.querySelector('.note-btn');
       noteBtn.addEventListener('click',e=>{
-        e.stopPropagation();
-        const cur=notes[l.key]||'';
-        const txt=prompt(`${t('notePrompt')} ${l.from} → ${l.to}:`,cur);
-        if(txt===null) return;              // cancelled
-        if(txt.trim()===''){ delete notes[l.key]; }
-        else notes[l.key]=txt.trim().slice(0,500);
-        saveNotes(); renderPanel();
-      });
+        e.stopPropagation(); openNoteEditor(l);});
       box.appendChild(row);
       if(notes[l.key]){
         const noteLine=document.createElement('div'); noteLine.className='leg-note';
@@ -592,7 +655,10 @@ function renderPanel(){
       }
       box.appendChild(elevPanel);
     });
-    wrap.querySelector('.sec-head').addEventListener('click',()=>{openState[sec.id]=!openState[sec.id];renderPanel();});
+    wrap.querySelector('.sec-head').addEventListener('click',()=>{
+      openState[sec.id]=!openState[sec.id];
+      wrap.classList.toggle('open',openState[sec.id]);
+    });
     secEl.appendChild(wrap);
   });
 }
@@ -615,7 +681,8 @@ document.getElementById('resetBtn').addEventListener('click',()=>{
 document.getElementById('expandBtn').addEventListener('click',e=>{
   const anyClosed=ROUTE.some(s=>!openState[s.id]);
   ROUTE.forEach(s=>openState[s.id]=anyClosed);
-  e.target.textContent=anyClosed?t('collapseAll'):t('expandAll');renderPanel();
+  secEl.querySelectorAll('.sec').forEach(w=>w.classList.toggle('open',anyClosed));
+  e.target.textContent=anyClosed?t('collapseAll'):t('expandAll');
 });
 
 // ---- GPX export (usable in OS Maps, Garmin, Komoot, Strava etc.) ----
@@ -639,14 +706,29 @@ document.getElementById('gpxBtn').addEventListener('click',()=>{
     gpx+='\n</trkseg>\n';
   });
   gpx+='</trk>\n</gpx>';
+  downloadGPX(gpx,'wales-coast-path.gpx',t('gpxDone'));
+});
+function downloadGPX(gpx,filename,noteMsg){
   const blob=new Blob([gpx],{type:'application/gpx+xml'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url; a.download='wales-coast-path.gpx';
+  a.href=url; a.download=filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
-  showNote(t('gpxDone'),'ok');
-});
+  if(noteMsg) showNote(noteMsg,'ok');
+}
+// GPX for a single leg — what you'd load into OS Maps / Garmin for one day walk
+function downloadLegGPX(l){
+  const g=legPath(l);
+  let gpx='<?xml version="1.0" encoding="UTF-8"?>\n';
+  gpx+='<gpx version="1.1" creator="Wales Coast Path Tracker" xmlns="http://www.topografix.com/GPX/1/1">\n';
+  gpx+=`<wpt lat="${g[0][0]}" lon="${g[0][1]}"><name>${xmlEsc(l.from)}</name></wpt>\n`;
+  gpx+=`<wpt lat="${g[g.length-1][0]}" lon="${g[g.length-1][1]}"><name>${xmlEsc(l.to)}</name></wpt>\n`;
+  gpx+=`<trk><name>${xmlEsc(l.from)} to ${xmlEsc(l.to)} (${l.miles} mi)</name>\n<trkseg>\n`;
+  g.forEach(p=>{ gpx+=`<trkpt lat="${p[0]}" lon="${p[1]}"/>`; });
+  gpx+='\n</trkseg>\n</trk>\n</gpx>';
+  downloadGPX(gpx,`wcp-${slug(l.from)}-${slug(l.to)}.gpx`,t('gpxLegDone'));
+}
 
 
 // ---- Share progress image (canvas render of the route + stats) ----
@@ -769,7 +851,7 @@ const statsBody=document.getElementById('statsBody');
 function closeStats(){ statsOverlay.classList.remove('open'); }
 document.getElementById('statsClose').addEventListener('click',closeStats);
 statsOverlay.addEventListener('click',e=>{ if(e.target===statsOverlay) closeStats(); });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeStats(); installOverlay.classList.remove('open'); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeStats(); installOverlay.classList.remove('open'); closeNote(); settleImportChoice(null); } });
 document.getElementById('statsBtn').addEventListener('click',()=>{
   statsBody.innerHTML=buildStatsHTML();
   statsOverlay.classList.add('open');
@@ -888,6 +970,7 @@ function showActionNote(msg,actionLabel,onAction){
   actionNoteTimer=setTimeout(()=>{ ioNote.innerHTML=''; ioNote.className='io-note'; },8000);
 }
 
+const EXPORT_DATE_KEY='wcp_last_export';
 // ---- Export progress to a downloadable file ----
 document.getElementById('exportBtn').addEventListener('click',()=>{
   const walked=legs.filter(l=>done[l.key]);
@@ -909,6 +992,7 @@ document.getElementById('exportBtn').addEventListener('click',()=>{
   a.href=url; a.download=`wales-coast-path-${safe}-${stamp}.json`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
+  try{ appStore.set(EXPORT_DATE_KEY,new Date().toISOString()); }catch(e){}
   showNote(`Exported ${walked.length} legs (${miles} mi). Keep this file to restore or move to another device.`,'ok');
 });
 
@@ -919,7 +1003,7 @@ importFile.addEventListener('change',e=>{
   const file=e.target.files&&e.target.files[0];
   if(!file) return;
   const reader=new FileReader();
-  reader.onload=()=>{
+  reader.onload=async()=>{
     try{
       const data=JSON.parse(reader.result);
       const incoming=data&&data.done&&typeof data.done==='object'?data.done:null;
@@ -937,8 +1021,12 @@ importFile.addEventListener('change',e=>{
       const norm=normalizeDone(expanded);
       const cleaned={};let n=0;
       Object.keys(norm).forEach(k=>{ if(validKeys.has(k)){ cleaned[k]=norm[k]; n++; } });
-      const replace=Object.keys(done).length===0 ||
-        confirm(`Import ${n} walked legs?\n\nOK = replace your current progress\nCancel = merge with what you already have`);
+      let mode='replace';
+      if(Object.keys(done).length>0){
+        mode=await askImportChoice(n, data.walker||null);
+        if(!mode){ importFile.value=''; return; }   // cancelled
+      }
+      const replace=(mode==='replace');
       if(replace){done=cleaned;} else {Object.assign(done,cleaned);}
       // restore notes if the file carries them (only for legs that exist)
       if(data.notes && typeof data.notes==='object'){
@@ -960,6 +1048,56 @@ importFile.addEventListener('change',e=>{
 });
 
 
+
+// ---- Note editor overlay (replaces prompt) ----
+const noteOverlay=document.getElementById('noteOverlay');
+const noteTextEl=document.getElementById('noteText');
+let noteKey=null;
+function closeNote(){ noteOverlay.classList.remove('open'); noteKey=null; }
+document.getElementById('noteClose').addEventListener('click',closeNote);
+noteOverlay.addEventListener('click',e=>{ if(e.target===noteOverlay) closeNote(); });
+function openNoteEditor(l){
+  noteKey=l.key;
+  document.getElementById('noteTitle').textContent=`${t('notePrompt')} ${l.from} → ${l.to}`;
+  document.getElementById('noteSaveBtn').textContent=t('saveNote');
+  document.getElementById('noteDeleteBtn').textContent=t('deleteNote');
+  noteTextEl.value=notes[l.key]||'';
+  noteOverlay.classList.add('open');
+  setTimeout(()=>noteTextEl.focus(),60);
+}
+document.getElementById('noteSaveBtn').addEventListener('click',()=>{
+  if(!noteKey) return;
+  const txt=noteTextEl.value.trim();
+  if(txt==='') delete notes[noteKey]; else notes[noteKey]=txt.slice(0,500);
+  const k=noteKey; saveNotes(); closeNote(); updateNoteLine(k);
+});
+document.getElementById('noteDeleteBtn').addEventListener('click',()=>{
+  if(!noteKey) return;
+  const k=noteKey; delete notes[k]; saveNotes(); closeNote(); updateNoteLine(k);
+});
+
+// ---- Import choice overlay (Replace / Merge / Cancel) ----
+const importOverlay=document.getElementById('importOverlay');
+let importResolve=null;
+function settleImportChoice(v){
+  importOverlay.classList.remove('open');
+  if(importResolve){ const r=importResolve; importResolve=null; r(v); }
+}
+function askImportChoice(n,walker){
+  document.getElementById('importChoiceTitle').textContent=t('importTitle');
+  const who=walker? ` (${walker})` : '';
+  document.getElementById('importChoiceMsg').textContent=t('importMsg').replace('{n}',n)+who;
+  document.getElementById('impReplaceBtn').textContent=t('impReplace');
+  document.getElementById('impMergeBtn').textContent=t('impMerge');
+  document.getElementById('impCancelBtn').textContent=t('impCancel');
+  importOverlay.classList.add('open');
+  return new Promise(res=>{ importResolve=res; });
+}
+document.getElementById('impReplaceBtn').addEventListener('click',()=>settleImportChoice('replace'));
+document.getElementById('impMergeBtn').addEventListener('click',()=>settleImportChoice('merge'));
+document.getElementById('impCancelBtn').addEventListener('click',()=>settleImportChoice(null));
+document.getElementById('importCloseX').addEventListener('click',()=>settleImportChoice(null));
+importOverlay.addEventListener('click',e=>{ if(e.target===importOverlay) settleImportChoice(null); });
 
 // ---- Bilingual UI (English / Cymraeg) ----
 const I18N={
@@ -991,6 +1129,14 @@ const I18N={
   poiFree:'Free parking',poiAccessible:'♿ Accessible',poiPaid:'Charge applies',
   poiZoomHint:'Zoom in to see parking, toilets and bus stops',
   poiMissing:'Places data not found — make sure pois.json is uploaded alongside the app.',
+  saveNote:'Save',deleteNote:'Delete note',
+  markWalked:'Mark walked / not walked',
+  legGpx:'Download GPX for this leg',
+  gpxLegDone:'Leg GPX downloaded — import it into OS Maps, Garmin or Komoot.',
+  importTitle:'Import progress',
+  importMsg:'This file contains {n} walked legs. Replace your current progress, or merge them together?',
+  impReplace:'Replace',impMerge:'Merge',impCancel:'Cancel',
+  backupNudge:'Tip: it\'s been a while since you exported a backup — tap ⬇ Export progress to keep a safe copy.',
   installNow:'Install now',installedNote:'✓ Already installed — you\'re using the app right now.',
   installIntro:'This site is a full app: once installed it gets its own icon, opens full-screen, and works offline.',
   iosH:'iPhone / iPad (Safari)',
@@ -1028,6 +1174,14 @@ const I18N={
   poiFree:'Parcio am ddim',poiAccessible:'♿ Hygyrch',poiPaid:'Codir tâl',
   poiZoomHint:'Chwyddwch i mewn i weld meysydd parcio, toiledau a safleoedd bws',
   poiMissing:'Data lleoedd heb ei ganfod — sicrhewch fod pois.json wedi\'i uwchlwytho.',
+  saveNote:'Cadw',deleteNote:'Dileu\'r nodyn',
+  markWalked:'Nodi fel wedi\'i gerdded / heb ei gerdded',
+  legGpx:'Lawrlwytho GPX y cam hwn',
+  gpxLegDone:'GPX y cam wedi\'i lawrlwytho — mewnforiwch i OS Maps, Garmin neu Komoot.',
+  importTitle:'Mewnforio cynnydd',
+  importMsg:'Mae\'r ffeil hon yn cynnwys {n} cam a gerddwyd. Disodli eich cynnydd presennol, neu eu cyfuno?',
+  impReplace:'Disodli',impMerge:'Cyfuno',impCancel:'Canslo',
+  backupNudge:'Awgrym: mae amser ers i chi allforio copi wrth gefn — tapiwch ⬇ Allforio cynnydd i gadw copi diogel.',
   installNow:'Gosod nawr',installedNote:'✓ Eisoes wedi\'i osod — rydych yn defnyddio\'r ap nawr.',
   installIntro:'Mae\'r wefan hon yn ap llawn: ar ôl ei gosod caiff ei heicon ei hun, mae\'n agor sgrin lawn, ac mae\'n gweithio all-lein.',
   iosH:'iPhone / iPad (Safari)',
@@ -1082,8 +1236,19 @@ function townSection(name){
   return l? ROUTE.find(s=>s.id===l.secId) : null;
 }
 function normTxt(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+let searchSel=-1;
+function chooseTown(n){
+  searchResults.classList.remove('open'); searchInput.value=n; searchSel=-1;
+  const tm=townByName[n];
+  const l=legs.find(x=>x.from===n||x.to===n);
+  const coord=l? (l.from===n? legPath(l)[0] : legPath(l)[legPath(l).length-1]) : null;
+  if(coord){ map.setView(coord,12); }
+  if(tm&&tm.marker&&tm.marker.openTooltip) tm.marker.openTooltip();
+  if(l){ openState[l.secId]=true;
+    const w=secEl.querySelector('.sec[data-sec="'+l.secId+'"]'); if(w) w.classList.add('open'); }
+}
 function doSearch(q){
-  searchResults.innerHTML='';
+  searchResults.innerHTML=''; searchSel=-1;
   q=normTxt(q.trim());
   if(q.length<2){ searchResults.classList.remove('open'); return; }
   const names=Object.keys(townByName).filter(n=>normTxt(n).includes(q)).slice(0,8);
@@ -1092,19 +1257,25 @@ function doSearch(q){
     const sec=townSection(n);
     const div=document.createElement('div'); div.className='search-hit';
     div.innerHTML=`<span>${n}</span><span class="sec-tag">${sec?sec.name:''}</span>`;
-    div.addEventListener('click',()=>{
-      searchResults.classList.remove('open'); searchInput.value=n;
-      const tm=townByName[n];
-      const l=legs.find(x=>x.from===n||x.to===n);
-      const coord=l? (l.from===n? legPath(l)[0] : legPath(l)[legPath(l).length-1]) : null;
-      if(coord){ map.setView(coord,12); }
-      if(tm&&tm.marker&&tm.marker.openTooltip) tm.marker.openTooltip();
-      if(l){ openState[l.secId]=true; renderPanel(); }
-    });
+    div.addEventListener('click',()=>chooseTown(n));
     searchResults.appendChild(div);
   });
   searchResults.classList.add('open');
 }
+function updateSearchSel(){
+  const hits=searchResults.querySelectorAll('.search-hit');
+  hits.forEach((h,i)=>h.classList.toggle('sel',i===searchSel));
+  if(searchSel>=0&&hits[searchSel]) hits[searchSel].scrollIntoView({block:'nearest'});
+}
+searchInput.addEventListener('keydown',e=>{
+  if(!searchResults.classList.contains('open')) return;
+  const hits=searchResults.querySelectorAll('.search-hit');
+  if(!hits.length) return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); searchSel=Math.min(searchSel+1,hits.length-1); updateSearchSel(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); searchSel=Math.max(searchSel-1,0); updateSearchSel(); }
+  else if(e.key==='Enter'){ e.preventDefault(); hits[searchSel>=0?searchSel:0].click(); }
+  else if(e.key==='Escape'){ searchResults.classList.remove('open'); searchSel=-1; }
+});
 searchInput.addEventListener('input',e=>doSearch(e.target.value));
 searchInput.addEventListener('blur',()=>setTimeout(()=>searchResults.classList.remove('open'),200));
 
@@ -1312,10 +1483,21 @@ function showTapHint(msg){
 
 (async()=>{
   await load();await loadNotes();
+  // Ask the browser to protect saved data from eviction (iOS Safari clears unused site storage after ~7 days)
+  if(navigator.storage && navigator.storage.persist){ navigator.storage.persist().catch(()=>{}); }
   try{ const r=await appStore.get(LANG_KEY); if(r&&r.value&&I18N[r.value]) LANG=r.value; }catch(e){}
   drawCoast();drawLegs();buildTowns();renderPanel();updateStats();refreshCoast();
   if(LANG!=='en') applyLang();
   else document.getElementById('langBtn').textContent='Cym';
+  // Backup nudge: progress exists but no export in the last 30 days
+  try{
+    if(Object.keys(done).length>=3){
+      const r=await appStore.get(EXPORT_DATE_KEY);
+      const last=r&&r.value? Date.parse(r.value) : NaN;
+      const age=isNaN(last)? Infinity : (Date.now()-last)/86400000;
+      if(age>30) showNote(t('backupNudge'),'');
+    }
+  }catch(e){}
   // restore any POI layers the user had switched on
   try{
     const r=await appStore.get(POI_STATE_KEY);
