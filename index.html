@@ -245,6 +245,36 @@
     #printSheet ul{list-style:none;padding:0;columns:2;column-gap:24px}
     #printSheet li{font-size:.82rem;padding:2px 0;break-inside:avoid}
   }
+
+  /* --- Phone header: one-line title, controls pinned top-right, both bars visible --- */
+  @media(max-width:760px){
+    header{flex-wrap:wrap;position:relative;gap:8px 12px;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top))}
+    .brand{flex:1 1 100%;min-width:0;padding-right:150px}
+    .brand .eyebrow{letter-spacing:.08em;font-size:.55rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .brand h1{white-space:nowrap;font-size:1.12rem}
+    .hdr-ctrls{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;margin:0;gap:5px}
+    .hdr-ctrls .ctrl-btn{padding:6px 9px;min-width:0}
+    .hdr-stats{flex:1 1 100%;flex-direction:column;align-items:stretch;gap:6px}
+    .hbar-row{display:flex;flex-wrap:nowrap;align-items:center;gap:12px}
+    .hbar-row + .hbar-row{margin-top:0}
+    .hdr-stats .hbar-track{display:block;flex:1 1 auto;width:auto;min-width:50px}
+  }
+  /* --- Town dots scale with zoom so they don't bury the route --- */
+  #map.z-far .town-dot{width:7px;height:7px;border-width:1.5px;box-shadow:none}
+  #map.z-far .town-dot.wp{display:none}
+  #map.z-mid .town-dot{width:11px;height:11px;border-width:2px}
+  /* --- Tide warnings --- */
+  .tide-pin{font-size:20px;line-height:26px;text-align:center;width:28px;height:28px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.35);border:2px solid #1f6f8b}
+  .tide-pin.major{border-color:#d62828}
+  #map.z-far .tide-pin{transform:scale(.7)}
+  .tide-note{margin:2px 0 6px 40px;padding:7px 10px;border-radius:8px;font-size:.78rem;line-height:1.4;
+    background:#e6f1f5;color:#143f4d;border-left:3px solid #1f6f8b}
+  .tide-note.major{background:#fbeaea;color:#6b1414;border-left-color:#d62828}
+  [data-theme="dark"] .tide-note{background:#16333b;color:#cfe6ec}
+  [data-theme="dark"] .tide-note.major{background:#3a1b1b;color:#f3d0d0}
+  .tide-pop b{display:block;margin-bottom:4px}
+  .tide-pop a{font-weight:700}
 </style>
 </head>
 <body>
@@ -1665,5 +1695,47 @@ function showTapHint(msg){
 <!-- GoatCounter analytics (privacy-friendly, no cookies) -->
 <script data-goatcounter="https://delwyno.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
+
+<script>
+/* ---- Tide warnings (sources: Pembrokeshire Coast National Park, Wales Coast Path) ---- */
+const TIDES=[{"id": "gann", "lat": 51.71975, "lon": -5.16695, "major": 1, "key": "pembs:dale>st-ishmael-s", "en": "The Gann, Dale", "cy": "Y Gann, Dale", "nen": "Only passable about 3 to 3½ hours either side of low water. The high-tide route adds about 2 miles, partly on a narrow road with no pavement.", "ncy": "Dim ond modd croesi tua 3 i 3½ awr bob ochr i'r distyll. Mae'r llwybr penllanw'n ychwanegu tua 2 filltir, rhan ohono ar ffordd gul heb balmant."}, {"id": "sandy", "lat": 51.72415, "lon": -5.10479, "major": 1, "key": "pembs:st-ishmael-s>sandy-haven", "en": "Sandy Haven", "cy": "Sandy Haven", "nen": "Only passable about 2½ to 3 hours either side of low tide. The high-tide detour is about 4 miles, mostly on road. Doing both crossings in a day? Reach the first as the tide is dropping.", "ncy": "Dim ond modd croesi tua 2½ i 3 awr bob ochr i'r distyll. Mae'r dargyfeiriad penllanw tua 4 milltir, ar y ffordd yn bennaf. Croesi'r ddwy mewn diwrnod? Cyrhaeddwch y gyntaf wrth i'r llanw fynd allan."}, {"id": "newport", "lat": 52.02227, "lon": -4.82903, "major": 0, "key": "pembs:moylgrove-newport-pembs-mid>newport-pembs", "en": "Newport (Pembs)", "cy": "Trefdraeth", "nen": "Between the Iron Bridge and Newport Sands the path can flood on the highest spring tides — usually best to wait for the water to drop.", "ncy": "Rhwng yr Hen Bont Haearn a'r Traeth Mawr gall y llwybr foddi ar y llanw mawr uchaf — gwell aros i'r dŵr gilio."}, {"id": "quoits", "lat": 51.67253, "lon": -4.94056, "major": 0, "key": "pembs:monkton>pwllcrochan", "en": "Quoits Mill, Pembroke", "cy": "Melin Quoits, Penfro", "nen": "West of Monkton the lane floods when the tide is over about 6.5 m — wait for it to drop rather than taking the road.", "ncy": "I'r gorllewin o Monkton mae'r lôn yn gorlifo pan fo'r llanw dros tua 6.5m — arhoswch iddo gilio yn hytrach na mynd ar y ffordd."}, {"id": "angle", "lat": 51.68231, "lon": -5.08344, "major": 0, "key": "pembs:angle-bay>angle", "en": "Point Lane, Angle", "cy": "Point Lane, Angle", "nen": "Can be covered for a short while on the highest tides.", "ncy": "Gall fod dan ddŵr am ychydig ar y llanw uchaf."}, {"id": "penally", "lat": 51.65864, "lon": -4.71457, "major": 0, "key": "pembs:lydstep>tenby", "en": "Penally", "cy": "Penalun", "nen": "The low-tide route crosses the shore by the MoD range. At high tide, or when the range is firing, use the alternative route via Penally.", "ncy": "Mae'r llwybr llanw isel yn croesi'r traeth ger maes tanio'r Weinyddiaeth Amddiffyn. Ar benllanw, neu pan fo tanio, defnyddiwch y llwybr amgen drwy Benalun."}, {"id": "llanfairpwll", "lat": 53.2181, "lon": -4.20628, "major": 0, "key": "anglesey:brynsiencyn>llanfairpwll", "en": "Llanfairpwll", "cy": "Llanfairpwll", "nen": "There's a high-tide alternative route here (via the Stokyn Lodge level crossing) for when the shore path is covered.", "ncy": "Mae llwybr amgen ar benllanw yma (drwy groesfan reilffordd Stokyn Lodge) ar gyfer pan fo llwybr y traeth dan ddŵr."}];
+const TIDE_TXT={en:{title:'Tidal section',major:'Tidal crossing',link:'Check tide times',warn:'Tide times vary \u2014 always check before setting off.'},
+  cy:{title:'Rhan lanwol',major:'Croesfan lanw',link:'Gwirio amseroedd y llanw',warn:'Mae amseroedd y llanw\u2019n amrywio \u2014 gwiriwch bob tro cyn cychwyn.'}};
+function tideLang(){ return (typeof LANG!=='undefined' && LANG==='cy')?'cy':'en'; }
+function tideUrl(){ return 'https://www.walescoastpath.gov.uk/plan-your-visit/tide-times/?lang='+tideLang(); }
+const TIDE_BY_KEY={}; TIDES.forEach(t=>{(TIDE_BY_KEY[t.key]=TIDE_BY_KEY[t.key]||[]).push(t);});
+const tideMarkers=[];
+function tidePopup(t){const L_=tideLang(),X=TIDE_TXT[L_];
+  return `<div class="tide-pop"><b>\u{1F30A} ${t.major?X.major:X.title}: ${L_==='cy'?t.cy:t.en}</b>${L_==='cy'?t.ncy:t.nen}`+
+         `<br><br>${X.warn}<br><a href="${tideUrl()}" target="_blank" rel="noopener">${X.link} \u2192</a></div>`;}
+function drawTides(){
+  tideMarkers.forEach(m=>map.removeLayer(m)); tideMarkers.length=0;
+  TIDES.forEach(t=>{
+    const m=L.marker([t.lat,t.lon],{zIndexOffset:900,icon:L.divIcon({className:'',html:`<div class="tide-pin${t.major?' major':''}">\u{1F30A}</div>`,iconSize:[28,28],iconAnchor:[14,14]})})
+      .addTo(map).bindPopup(()=>tidePopup(t),{maxWidth:260,autoPanPaddingTopLeft:L.point(64,20),autoPanPaddingBottomRight:L.point(20,20)});
+    tideMarkers.push(m);
+  });
+}
+function addTideLines(){
+  document.querySelectorAll('.tide-note').forEach(e=>e.remove());
+  document.querySelectorAll('.leg[data-key]').forEach(row=>{
+    const list=TIDE_BY_KEY[row.dataset.key]; if(!list) return;
+    const L_=tideLang(); let after=row;
+    if(after.nextElementSibling && after.nextElementSibling.classList.contains('leg-note')) after=after.nextElementSibling;
+    list.forEach(t=>{const d=document.createElement('div');d.className='tide-note'+(t.major?' major':'');
+      d.innerHTML=`\u{1F30A} <b>${t.major?TIDE_TXT[L_].major:TIDE_TXT[L_].title}:</b> ${L_==='cy'?t.ncy:t.nen} <a href="${tideUrl()}" target="_blank" rel="noopener">${TIDE_TXT[L_].link}</a>`;
+      after.after(d); after=d;});
+  });
+}
+/* keep tide lines after the panel re-renders (language switch, reset, import) */
+const _renderPanelOrig=renderPanel;
+renderPanel=function(){ _renderPanelOrig.apply(this,arguments); addTideLines(); };
+/* town dot size follows zoom */
+function applyZoomClass(){const z=map.getZoom(),el=map.getContainer();
+  el.classList.toggle('z-far',z<=8); el.classList.toggle('z-mid',z>8&&z<=10);}
+map.on('zoomend',applyZoomClass); applyZoomClass();
+drawTides();
+(function waitPanel(){ if(document.querySelector('.leg[data-key]')) addTideLines(); else setTimeout(waitPanel,300); })();
+</script>
 </body>
 </html>
