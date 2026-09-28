@@ -2,6 +2,8 @@
 
 An interactive map for logging your walk along the [Wales Coast Path](https://www.walescoastpath.gov.uk/) — all 870 miles of it, from the English border near Chester round to Chepstow on the Severn.
 
+https://github.com/user-attachments/assets/f055998c-b9bb-4d4a-a616-c67b1a7702fa
+
 Click from one town to the next along the coast and the real stretch of path between them turns **red** to mark it walked. The app keeps a running total of your miles and the percentage of the path complete, and it saves your progress automatically. It's a single self-contained HTML file with no install, no sign-up, and no server — so it runs straight from GitHub Pages or even by opening the file locally.
 
 ## Features
